@@ -11,10 +11,10 @@ test {
 }
 
 dependencies {
-	compile 'com.google.maps:google-maps-services:0.2.7'
 	compile group: 'org.xerial', name: 'sqlite-jdbc', version: '3.21.0.1'
+	compile 'com.google.maps:google-maps-services:0.2.7'
+	compile group: 'fr.dudie', name: 'nominatim-api', version: '3.3'
 
     // Use JUnit test framework
     testImplementation 'junit:junit:4.12'
 }
-
