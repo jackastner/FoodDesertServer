@@ -6,6 +6,8 @@ import com.google.maps.errors.ApiException;
 import com.google.maps.model.LatLng;
 import com.google.maps.model.PlaceType;
 
+import fooddesertserver.GroceryStore;
+
 import java.util.List;
 import java.util.Properties;
 
@@ -52,21 +54,21 @@ public class GooglePlacesClientTest {
     /* test that a zero radius request returns an empty result */
     @Test
     public void requestReturnsEmpty() throws ApiException, InterruptedException, IOException {
-        List<LatLng> results = placeClient.nearbyQueryFor(nullPoint, 1, PlaceType.GROCERY_OR_SUPERMARKET);
+        List<GroceryStore> results = placeClient.nearbyQueryFor(nullPoint, 1, PlaceType.GROCERY_OR_SUPERMARKET);
         assertTrue(results.isEmpty());
     }
 
     /* Test that nearbyQuery does not return null even if result is empty */
     @Test
     public void requestReturnsNonNull() throws ApiException, InterruptedException, IOException {
-        List<LatLng> results = placeClient.nearbyQueryFor(nullPoint, 1, PlaceType.GROCERY_OR_SUPERMARKET);
+        List<GroceryStore> results = placeClient.nearbyQueryFor(nullPoint, 1, PlaceType.GROCERY_OR_SUPERMARKET);
         assertNotNull(results);
     }
 
     /* Test that some results are returned for a query that should return results */
     @Test
     public void requestReturnsResults() throws ApiException, InterruptedException, IOException {
-        List<LatLng> results = placeClient.nearbyQueryFor(collegePark, 10 * 1600, PlaceType.GROCERY_OR_SUPERMARKET);
+        List<GroceryStore> results = placeClient.nearbyQueryFor(collegePark, 10 * 1600, PlaceType.GROCERY_OR_SUPERMARKET);
         System.out.println(results);
         assertFalse(results.isEmpty());
     }
