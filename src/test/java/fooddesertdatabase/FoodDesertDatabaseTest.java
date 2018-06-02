@@ -13,10 +13,14 @@ import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.util.List;
 
-import org.junit.*;
+import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Test;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.io.ParseException;
 
 import fooddesertserver.GroceryStore;
@@ -129,4 +133,24 @@ public class FoodDesertDatabaseTest {
         assertEquals(2, result.size());
     }
 
+    /**
+     * Test that a point within the searched buffer is correctly reported as
+     * in the buffer.
+     */
+    @Test
+    public void testInSearchedBuffer() throws SQLException {
+        Point testPoint = geoFactory.createPoint(new Coordinate(0, 0));
+
+        dbInterface.insertSearchedBuffer(testPoint,10);
+        assertTrue(dbInterface.inSearchedBuffer(testPoint));
+    }
+
+    @Test
+    public void testNotInSearchedBuffer() throws SQLException {
+        Point testPoint0 = geoFactory.createPoint(new Coordinate(0, 0));
+        Point testPoint1 = geoFactory.createPoint(new Coordinate(100, 100));
+
+        dbInterface.insertSearchedBuffer(testPoint0,10);
+        assertFalse(dbInterface.inSearchedBuffer(testPoint1));
+    }
 }
