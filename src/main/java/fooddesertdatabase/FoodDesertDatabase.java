@@ -1,0 +1,205 @@
+package fooddesertdatabase;
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.sqlite.SQLiteConfig;
+
+import fooddesertserver.GroceryStore;
+
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.io.ParseException;
+import org.locationtech.jts.io.WKTReader;
+
+/**
+ * @author john This class is used to interact with SqLite/SpatialLite databases
+ *         with a 'grocery_store' table defined according to the schema in this
+ *         class.
+ */
+public class FoodDesertDatabase implements AutoCloseable {
+
+    /* String definitions for tables and columns in the spatial database */
+    private static final String GROCERY_TABLE = "grocery_stores";
+    private static final String ID_COLUMN = "id";
+    private static final String LOCATION_COLUMN = "location";
+    private static final String NAME_COLUMN = "name";
+    private static final String EPGS = "3857";
+
+    /* Loads SqLite database connection */
+    static {
+        try {
+            Class.forName("org.sqlite.JDBC");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    /* geomReader is used to parse geographic elements of the database into JTS
+     * objects */
+    private final WKTReader geomReader;
+
+    /* This is the connection used to access the database */
+    private final Connection connection;
+
+    /**
+     * Opens a connection and constructs an interface for accessing the database in
+     * dbFile. This should only be called on a database that was created by a call
+     * to SpatiaLiteInterface.createDatabase(String)
+     *
+     * @param dbFile name of SqLite database file
+     * @throws SQLException
+     */
+    public FoodDesertDatabase(String dbFile) throws SQLException {
+        SQLiteConfig config = new SQLiteConfig();
+        config.enableLoadExtension(true);
+        this.connection = DriverManager.getConnection("jdbc:sqlite:" + dbFile, config.toProperties());
+        this.geomReader = new WKTReader();
+        initSpatiaLite();
+    }
+
+    /**
+     * Instantiate a SpatiaLite interface for an existing connection. Used to reuse
+     * the connection used to create the database in createDatabase.
+     *
+     * @param spatialiteConnection
+     * @throws SQLException
+     */
+    private FoodDesertDatabase(Connection spatialiteConnection) throws SQLException {
+        this.connection = spatialiteConnection;
+        this.geomReader = new WKTReader();
+        initSpatiaLite();
+    }
+
+    /**
+     * Creates a new database file with one user defined Grocery Store table contain
+     * and ID, Name and, Location column. The location column is a SpatiaLite
+     * geometry column and, a spatial index is created on this column.
+     *
+     * @param dbname Name of the database file to be created
+     * @return A SpatialLiteInterface that provides access to the created database
+     * @throws SQLException
+     */
+    public static FoodDesertDatabase createDatabase(String dbname) throws SQLException {
+        SQLiteConfig config = new SQLiteConfig();
+        config.enableLoadExtension(true);
+
+        Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbname, config.toProperties());
+        
+        try (Statement stmt = conn.createStatement()) {
+            /*declarations required to use SpatiaLite functions*/
+            stmt.execute("SELECT load_extension('mod_spatialite')");
+            stmt.execute("SELECT InitSpatialMetaData(1)");
+
+            /*Create main grocery table*/
+            stmt.execute("CREATE TABLE " + GROCERY_TABLE + "(" + ID_COLUMN + " INTEGER NOT NULL PRIMARY KEY, "
+                    + NAME_COLUMN + " TEXT)");
+            
+            /*add a geometry column to this table and index it with a spatial index*/
+            stmt.execute("SELECT AddGeometryColumn('" + GROCERY_TABLE + "', '" + LOCATION_COLUMN + "', " + EPGS
+                    + ", 'POINT', 2)");
+            stmt.execute("SELECT CreateSpatialIndex('" + GROCERY_TABLE + "', '" + LOCATION_COLUMN + "')");
+        }
+
+        return new FoodDesertDatabase(conn);
+    }
+
+    /* Using spatialite commands requires loading an extension */
+    private void initSpatiaLite() throws SQLException {
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute("SELECT load_extension('mod_spatialite')");
+        }
+    }
+
+    /**
+     * This method inserts a Grocery store into the SpatiaLite database and returns
+     * a new store with Id set to the id of the store in the database. If this
+     * method is called with on a store with id already set, an illegal argument
+     * exception is thrown.
+     *
+     * @param store A newly created GroceryStore to be inserted into the database
+     * @return An updated copy of the GroceryStore with id set to reflect the stores
+     *         id in the database
+     * @throws SQLException
+     */
+    public GroceryStore insertStore(GroceryStore store) throws SQLException {
+
+        if (store.hasId()) {
+            throw new IllegalArgumentException("Store already exists in database!");
+        }
+
+        connection.setAutoCommit(false);
+
+        String sql = "INSERT INTO " + GROCERY_TABLE + " ( " + NAME_COLUMN + ", " + LOCATION_COLUMN + ") "
+                + "VALUES ( ? , GeomFromText(? , " + EPGS + "));";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, store.getName());
+            stmt.setString(2, store.getLocation().toText());
+            stmt.executeUpdate();
+        }
+
+        int id;
+        sql = "SELECT last_insert_rowid();";
+        try (Statement stmt = connection.createStatement()) {
+            ResultSet res = stmt.executeQuery(sql);
+            res.next();
+            id = res.getInt(1);
+        }
+
+        connection.commit();
+
+        connection.setAutoCommit(true);
+
+        return store.setId(id);
+    }
+
+    /**
+     * Perform a spatial search on GroceryStores in the SpatialLite database.
+     *
+     * @param searchFrame Area to be searched. The search is conducted in the containing
+     *        rectangle of this geometry
+     * @return A list of GroceryStores in the database within the search frame
+     * @throws SQLException
+     * @throws ParseException
+     */
+    public List<GroceryStore> selectStore(Geometry searchFrame) throws SQLException, ParseException {
+        String sql = "SELECT " + ID_COLUMN + ", " + NAME_COLUMN + ", AsText(" + LOCATION_COLUMN + ") FROM "
+                + GROCERY_TABLE + " WHERE " + ID_COLUMN + " IN (SELECT ROWID FROM SpatialIndex "
+                + "WHERE f_table_name = '" + GROCERY_TABLE + "' AND search_frame = GeomFromText(?));";
+
+        List<GroceryStore> selectedStores = new ArrayList<>();
+
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, searchFrame.toText());
+
+            ResultSet selected = stmt.executeQuery();
+            while (selected.next()) {
+                int id = selected.getInt(1);
+                String name = selected.getString(2);
+                String locationWKT = selected.getString(3);
+                Point location = (Point) geomReader.read(locationWKT);
+
+                selectedStores.add(new GroceryStore(id, name, location));
+            }
+        }
+        return selectedStores;
+    }
+
+    /**
+     * Delete the contents of this database while preserving the structure
+     * @throws SQLException
+     */
+    public void truncate() throws SQLException {
+        String sql = "DELETE FROM " + GROCERY_TABLE + ";";
+        try (Statement stmt = connection.createStatement()) {
+            stmt.executeUpdate(sql);
+        }
+    }
+
+    @Override
+    public void close() throws SQLException {
+        connection.close();
+    }
+
+}
