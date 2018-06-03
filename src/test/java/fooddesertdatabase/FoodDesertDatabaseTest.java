@@ -114,6 +114,18 @@ public class FoodDesertDatabaseTest {
     }
 
     @Test
+    public void testNoDuplicates() throws SQLException, ParseException {
+        dbInterface.insertAll(testStoreName,testStoreNullName,testStoreName,testStoreNullName);
+
+        List<GroceryStore> result = dbInterface.selectStore(searchFrame);
+        assertEquals(2,result.size());
+    }
+
+
+    /**
+     * test that a spatial query can correctly return more than one store
+     */
+    @Test
     public void testSpatialQueryMultiple() throws SQLException, ParseException {
         dbInterface.insertStore(testStoreName);
         dbInterface.insertStore(testStoreNullName);

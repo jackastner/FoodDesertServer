@@ -15,6 +15,7 @@ import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKTReader;
 import org.sqlite.SQLiteConfig;
+import org.sqlite.SQLiteErrorCode;
 
 import fooddesertserver.GroceryStore;
 
@@ -104,10 +105,10 @@ public class FoodDesertDatabase implements AutoCloseable {
 
             /*Create main grocery table*/
             stmt.execute("CREATE TABLE " + GROCERY_TABLE + "(" + GROCERY_ID_COLUMN + " INTEGER NOT NULL PRIMARY KEY, "
-                    + GROCERY_NAME_COLUMN + " TEXT)");
+                    + GROCERY_NAME_COLUMN + " TEXT, " + GROCERY_LOCATION_COLUMN + " UNIQUE)");
 
             /*add a geometry column to this table and index it with a spatial index*/
-            stmt.execute("SELECT AddGeometryColumn('" + GROCERY_TABLE + "', '" + GROCERY_LOCATION_COLUMN + "', " + EPGS
+            stmt.execute("SELECT RecoverGeometryColumn('" + GROCERY_TABLE + "', '" + GROCERY_LOCATION_COLUMN + "', " + EPGS
                     + ", 'POINT', 2)");
             stmt.execute("SELECT CreateSpatialIndex('" + GROCERY_TABLE + "', '" + GROCERY_LOCATION_COLUMN + "')");
 
@@ -151,7 +152,19 @@ public class FoodDesertDatabase implements AutoCloseable {
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             stmt.setString(1, store.getName());
             stmt.setString(2, store.getLocation().toText());
-            stmt.executeUpdate();
+
+            try {
+                stmt.executeUpdate();
+            } catch (SQLException sqlEx ) {
+                /* It's fine if the unique constraint fails since that just means that a duplicate
+                 * was not added to the db. Any other error should be re-thrown.
+                 *
+                 * This check actually only checks if the fail is caused by any constraint error.
+                 * I would like it to check for specifically unique errors.*/
+                if(sqlEx.getErrorCode() != SQLiteErrorCode.SQLITE_CONSTRAINT.code) {
+                    throw sqlEx;
+                }
+            }
         }
 
         int id;
