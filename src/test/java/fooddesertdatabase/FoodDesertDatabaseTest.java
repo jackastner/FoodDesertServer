@@ -32,6 +32,7 @@ public class FoodDesertDatabaseTest {
     private GeometryFactory geoFactory;
     private GroceryStore testStoreName;
     private GroceryStore testStoreNullName;
+    private Geometry searchFrame;
 
     @BeforeClass
     public static void openDB() throws SQLException, IOException {
@@ -57,6 +58,14 @@ public class FoodDesertDatabaseTest {
         geoFactory = new GeometryFactory();
         testStoreName = new GroceryStore("test", geoFactory.createPoint(new Coordinate(0, 0)));
         testStoreNullName = new GroceryStore(null, geoFactory.createPoint(new Coordinate(1, 1)));
+
+        searchFrame = geoFactory.createPolygon(new Coordinate[] {
+                new Coordinate(-5, -5),
+                new Coordinate( 5, -5),
+                new Coordinate( 5,  5),
+                new Coordinate(-5,  5),
+                new Coordinate(-5, -5)
+        });
     }
 
     /**
@@ -88,9 +97,6 @@ public class FoodDesertDatabaseTest {
     public void testSpatialQuery() throws SQLException, ParseException {
         dbInterface.insertStore(testStoreName);
 
-        Geometry searchFrame = geoFactory.createPolygon(new Coordinate[] { new Coordinate(-5, -5),
-                new Coordinate(5, -5), new Coordinate(5, 5), new Coordinate(-5, 5), new Coordinate(-5, -5) });
-
         List<GroceryStore> result = dbInterface.selectStore(searchFrame);
 
         assertFalse(result.isEmpty());
@@ -103,14 +109,6 @@ public class FoodDesertDatabaseTest {
      */
     @Test
     public void testSpatialQueryEmpty() throws SQLException, ParseException {
-        Geometry searchFrame = geoFactory.createPolygon(new Coordinate[] {
-                new Coordinate(-5, -5),
-                new Coordinate( 5, -5),
-                new Coordinate( 5,  5),
-                new Coordinate(-5,  5),
-                new Coordinate(-5, -5)
-        });
-
         List<GroceryStore> result = dbInterface.selectStore(searchFrame);
         assertTrue(result.isEmpty());
     }
@@ -120,13 +118,19 @@ public class FoodDesertDatabaseTest {
         dbInterface.insertStore(testStoreName);
         dbInterface.insertStore(testStoreNullName);
 
-        Geometry searchFrame = geoFactory.createPolygon(new Coordinate[] {
-                new Coordinate(-5, -5),
-                new Coordinate( 5, -5),
-                new Coordinate( 5,  5),
-                new Coordinate(-5,  5),
-                new Coordinate(-5, -5)
-        });
+        List<GroceryStore> result = dbInterface.selectStore(searchFrame);
+
+        assertEquals(2, result.size());
+    }
+
+
+    /**
+     * Test the same behavior as testSpatialQueryMultiple but also
+     * test that insertAll behaves correctly.
+     */
+    @Test
+    public void testInsertAll() throws SQLException, ParseException {
+        dbInterface.insertAll(testStoreName, testStoreNullName);
 
         List<GroceryStore> result = dbInterface.selectStore(searchFrame);
 
@@ -145,6 +149,10 @@ public class FoodDesertDatabaseTest {
         assertTrue(dbInterface.inSearchedBuffer(testPoint));
     }
 
+    /**
+     * Test a point is not erroneously reported as being in the searched
+     * buffer.
+     */
     @Test
     public void testNotInSearchedBuffer() throws SQLException {
         Point testPoint0 = geoFactory.createPoint(new Coordinate(0, 0));

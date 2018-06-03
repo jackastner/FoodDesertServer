@@ -7,6 +7,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.locationtech.jts.geom.Geometry;
@@ -141,12 +142,9 @@ public class FoodDesertDatabase implements AutoCloseable {
      * @throws SQLException
      */
     public GroceryStore insertStore(GroceryStore store) throws SQLException {
-
         if (store.hasId()) {
             throw new IllegalArgumentException("Store already exists in database!");
         }
-
-        connection.setAutoCommit(false);
 
         String sql = "INSERT INTO " + GROCERY_TABLE + " ( " + GROCERY_NAME_COLUMN + ", " + GROCERY_LOCATION_COLUMN + ") "
                 + "VALUES ( ? , GeomFromText(? , " + EPGS + "));";
@@ -164,11 +162,26 @@ public class FoodDesertDatabase implements AutoCloseable {
             id = res.getInt(1);
         }
 
-        connection.commit();
-
-        connection.setAutoCommit(true);
-
         return store.setId(id);
+    }
+
+    /**
+     * Insert all of a collection of stores into the database.
+     *
+     * @param stores
+     * @throws SQLException
+     */
+    public void insertAll(Iterable<GroceryStore> stores) throws SQLException {
+        connection.setAutoCommit(false);
+        for(GroceryStore s : stores) {
+            insertStore(s);
+        }
+        connection.commit();
+        connection.setAutoCommit(true);
+    }
+
+    public void insertAll(GroceryStore... stores) throws SQLException {
+        insertAll(Arrays.asList(stores));
     }
 
     /**
