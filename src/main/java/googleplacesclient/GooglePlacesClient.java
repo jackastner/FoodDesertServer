@@ -36,14 +36,14 @@ public class GooglePlacesClient {
     /* The Places API requires a 2 second wait between a request and a subsequent
      * request for the next page. This means that a query can take multiple second
      * to complete so, this method should never be called on the main thread. */
-    public List<GroceryStore> nearbyQueryFor(LatLng location, int radius, PlaceType type)
+    public List<GroceryStore> nearbyQueryFor(Point location, int radius)
             throws ApiException, InterruptedException, IOException {
         // initialize to size 60 because the places API returns max 60 results
         List<GroceryStore> results = new ArrayList<>(60);
 
         // prepare initial query for Places API
-        NearbySearchRequest request = PlacesApi.nearbySearchQuery(this.context, location);
-        PlacesSearchResponse response = request.radius(radius).type(type).await();
+        NearbySearchRequest request = PlacesApi.nearbySearchQuery(this.context, pointToLatLng(location));
+        PlacesSearchResponse response = request.radius(radius).type(PlaceType.GROCERY_OR_SUPERMARKET).await();
 
         fillResultsList(response, results);
 
@@ -83,5 +83,10 @@ public class GooglePlacesClient {
     /*Create a JTS point for a LatLng obtained from the Places API*/
     private Point latLngToPoint(LatLng latLng) {
         return geoFactory.createPoint(new Coordinate(latLng.lat, latLng.lng));
+    }
+
+    /*Create a LatLng for use in the Place API from a JTS Point */
+    private LatLng pointToLatLng(Point p) {
+        return new LatLng(p.getX(), p.getY());
     }
 }
