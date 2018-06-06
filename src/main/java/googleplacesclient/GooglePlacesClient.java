@@ -33,9 +33,15 @@ public class GooglePlacesClient {
         geoFactory = new GeometryFactory();
     }
 
-    /* The Places API requires a 2 second wait between a request and a subsequent
+    /**
+     *The Places API requires a 2 second wait between a request and a subsequent
      * request for the next page. This means that a query can take multiple second
-     * to complete so, this method should never be called on the main thread. */
+     * to complete so, this method should never be called on the main thread.
+     *
+     * @param location The center of the query area.
+     * @param radius Radius in meters around the query point to search for grocery stores.
+     * @return A list of up to 60 grocery stores found in that area.
+     */
     public List<GroceryStore> nearbyQueryFor(Point location, int radius)
             throws ApiException, InterruptedException, IOException {
         // initialize to size 60 because the places API returns max 60 results

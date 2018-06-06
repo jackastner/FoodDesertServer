@@ -236,7 +236,7 @@ public class FoodDesertDatabase implements AutoCloseable {
      * @param radius Distance around the center that was searched.
      * @throws SQLException
      */
-    public void insertSearchedBuffer(Point searched, int radius) throws SQLException {
+    public void insertSearchedBuffer(Point searched, double radius) throws SQLException {
         String sql = "INSERT INTO " + SEARCHED_TABLE + " ( " + SEARCHED_BUFFER_COLUMN + ") "
                    + "VALUES (GeomFromText(? , " + EPGS + "));";
         Geometry buffer = searched.buffer(radius);
