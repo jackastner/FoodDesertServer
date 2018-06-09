@@ -36,7 +36,7 @@ public class FoodDesertDatabase implements AutoCloseable {
     private static final String SEARCHED_ID_COLUMN = "id";
     private static final String SEARCHED_BUFFER_COLUMN = "buffer";
 
-    private static final String EPGS = "3857";
+    private static final String EPGS = "4326";
 
     /* Loads SqLite database connection */
     static {

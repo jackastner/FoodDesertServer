@@ -42,7 +42,9 @@ public class GooglePlacesClientTest {
     public void setupPlaceClient() {
         GeometryFactory geoFact = new GeometryFactory();
         placeClient = new GooglePlacesClient(googleApiKey);
-        collegePark = geoFact.createPoint(new Coordinate(38.996, -76.927));
+
+        /*construct points as (lng,lat)*/
+        collegePark = geoFact.createPoint(new Coordinate(-76.927, 38.996));
         nullPoint = geoFact.createPoint(new Coordinate(0, 0));
     }
 

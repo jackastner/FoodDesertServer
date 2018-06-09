@@ -82,11 +82,12 @@ public class GooglePlacesClient {
 
     /*Create a JTS point for a LatLng obtained from the Places API*/
     private Point latLngToPoint(LatLng latLng) {
-        return geoFactory.createPoint(new Coordinate(latLng.lat, latLng.lng));
+        /*JTS expects coords at (lng,lat)*/
+        return geoFactory.createPoint(new Coordinate(latLng.lng, latLng.lat));
     }
 
     /*Create a LatLng for use in the Place API from a JTS Point */
     private LatLng pointToLatLng(Point p) {
-        return new LatLng(p.getX(), p.getY());
+        return new LatLng(p.getY(), p.getX());
     }
 }
