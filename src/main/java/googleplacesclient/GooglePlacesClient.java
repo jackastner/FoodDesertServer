@@ -19,11 +19,26 @@ import com.google.maps.model.PlacesSearchResult;
 
 import fooddesertserver.GroceryStore;
 
+
+
+/**
+ * @author john
+ *        This class handles communication with the Google Places API mostly through
+ *        calls to the com.google.maps.PlaceApi class which does the real work.
+ *
+ *        This class should be thread safe, but that is based on the assumption that
+ *        org.locationtech.jts.geom.GeometryFactory is thread safe. I could not find
+ *        documentation of this fact anywhere but, after reading the source code, I think it is thread safe.
+ *        (https://github.com/locationtech/jts/blob/master/modules/core/src/main/java/org/locationtech/jts/geom/GeometryFactory.java)
+ */
 public class GooglePlacesClient {
 
     private final GeoApiContext context;
 
-    /*factory used to construct points for grocery stores*/
+    /* Factory used to construct points for grocery stores
+     * I *think* this class is thread safe so, I'm not wrapping it
+     * in a ThreadLocal. If weird issues start showing up this
+     * could be why. */
     private GeometryFactory geoFactory;
 
     /* Since this class talks to the Google Places API, an API key is needed to

@@ -18,6 +18,8 @@ import googleplacesclient.GooglePlacesClient;
  * This class combines the operations implemented by the FoodDesertDatabase and GooglePlacesClient classes to
  * implement the main functionalities of the FoodDesertServer. These include determining if a given point is in a food
  * desert, finding all grocery stores in an area and, determining the closest store to a point.
+ *
+ * This class is thread safe. See FoodDesertDatabase and GooglePlacesClient for details.
  */
 public class FoodDesertQueryHandler {
 
@@ -86,6 +88,7 @@ public class FoodDesertQueryHandler {
      */
     private double getBufferRadiusDegress(Point p) {
         double radiusMeters = getBufferRadiusMeters(p);
+        /*this is a fairly rough estimate, see: https://gis.stackexchange.com/a/2964/85520*/
         final double DEGREES_IN_METER = 1.0/111_111.0;
         return radiusMeters * DEGREES_IN_METER;
     }

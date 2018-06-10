@@ -20,9 +20,12 @@ import org.sqlite.SQLiteErrorCode;
 import fooddesertserver.GroceryStore;
 
 /**
- * @author john This class is used to interact with SqLite/SpatialLite databases
+ * @author john
+ *         This class is used to interact with SqLite/SpatialLite databases
  *         with a 'grocery_store' table defined according to the schema in this
  *         class.
+ *
+ *         This class is Thread safe.
  */
 public class FoodDesertDatabase implements AutoCloseable {
 
@@ -48,8 +51,17 @@ public class FoodDesertDatabase implements AutoCloseable {
     }
 
     /* geomReader is used to parse geographic elements of the database into JTS
-     * objects */
-    private final WKTReader geomReader;
+     * objects.
+     * *
+     * I believe that WKTReader class is *not* thread safe so, I have made this
+     * field ThreadLocal. Consider removing this if WKTReader is thread safe or
+     * using synchronization instead of ThreadSafe.
+     */
+    private static final ThreadLocal<WKTReader> geomReader = new ThreadLocal<WKTReader>() {
+        protected WKTReader initialValue() {
+            return new WKTReader();
+        }
+    };
 
     /* This is the connection used to access the database */
     private final Connection connection;
@@ -66,7 +78,6 @@ public class FoodDesertDatabase implements AutoCloseable {
         SQLiteConfig config = new SQLiteConfig();
         config.enableLoadExtension(true);
         this.connection = DriverManager.getConnection("jdbc:sqlite:" + dbFile, config.toProperties());
-        this.geomReader = new WKTReader();
         initSpatiaLite();
     }
 
@@ -79,7 +90,6 @@ public class FoodDesertDatabase implements AutoCloseable {
      */
     private FoodDesertDatabase(Connection spatialiteConnection) throws SQLException {
         this.connection = spatialiteConnection;
-        this.geomReader = new WKTReader();
         initSpatiaLite();
     }
 
@@ -221,7 +231,7 @@ public class FoodDesertDatabase implements AutoCloseable {
                 int id = selected.getInt(1);
                 String name = selected.getString(2);
                 String locationWKT = selected.getString(3);
-                Point location = (Point) geomReader.read(locationWKT);
+                Point location = (Point) geomReader.get().read(locationWKT);
 
                 selectedStores.add(new GroceryStore(id, name, location));
             }

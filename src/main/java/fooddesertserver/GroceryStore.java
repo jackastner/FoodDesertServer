@@ -8,7 +8,7 @@ import org.locationtech.jts.geom.Point;
  *         The GroceryStore class represents a grocery store found by the places
  *         API and stored in the food desert database.
  *
- *         This class is immutable.
+ *         This class is immutable and therefore is thread safe.
  */
 public class GroceryStore {
 
