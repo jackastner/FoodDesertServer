@@ -32,6 +32,8 @@ public class FoodDesertServer {
         /*used to build points for url parameters*/
         GeometryFactory geoFactory = new GeometryFactory();
 
+        staticFiles.location("/public");
+
         get("/is_in_food_desert", (request, response) -> {
             double lng = Double.parseDouble(request.queryParams("lng"));
             double lat = Double.parseDouble(request.queryParams("lat"));
