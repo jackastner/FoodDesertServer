@@ -177,3 +177,8 @@ fabric.properties
 .idea/sonarlint
 
 # End of https://www.gitignore.io/api/intellij
+
+# QGIS
+
+*.qgd
+*.qgs~
