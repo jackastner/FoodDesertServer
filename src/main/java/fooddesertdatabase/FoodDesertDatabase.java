@@ -279,6 +279,40 @@ public class FoodDesertDatabase implements AutoCloseable {
     }
 
     /**
+     * Select from the database the area within the search frame that is also within the area that has been searched
+     * for grocery store. If the area is empty, this method returns null.
+     * @param searchFrame Area being compared with the searched area
+     * @return Geometry containing the intersection of searchFrame and the grocery store searched area or null of this
+     *         Geometry would be empty.
+     */
+    public Geometry selectSearchedBuffer(Geometry searchFrame) throws SQLException, ParseException {
+        String sql = "SELECT AsText(ST_Intersection(GeomFromText(?), ST_Union(" + SEARCHED_BUFFER_COLUMN + "))) FROM " + SEARCHED_TABLE + " WHERE " +
+                     SEARCHED_ID_COLUMN + " IN (SELECT ROWID FROM SpatialIndex WHERE " +
+                     "f_table_name = '" + SEARCHED_TABLE + "' AND search_frame = GeomFromText(?));";
+
+        try(PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, searchFrame.toText());
+            stmt.setString(2, searchFrame.toText());
+
+            ResultSet result = stmt.executeQuery();
+            if(result.next()) {
+                String unionWKT = result.getString(1);
+
+                /* When the searched frame does not contain any part of the searched buffer,
+                 * the the result string from SpatiaLite is null. */
+                if(unionWKT == null){
+                    return null;
+                } else {
+                    return geomReader.get().read(unionWKT);
+                }
+            } else {
+                throw new SQLException("A query that should always return a result did not return anything!");
+            }
+        }
+
+    }
+
+    /**
      * Delete the contents of this database while preserving the structure
      * @throws SQLException
      */

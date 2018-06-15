@@ -1,10 +1,5 @@
 package fooddesertdatabase;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertTrue;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -24,6 +19,8 @@ import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.io.ParseException;
 
 import fooddesertserver.GroceryStore;
+
+import static org.junit.Assert.*;
 
 public class FoodDesertDatabaseTest {
 
@@ -172,5 +169,48 @@ public class FoodDesertDatabaseTest {
 
         dbInterface.insertSearchedBuffer(testPoint0,10);
         assertFalse(dbInterface.inSearchedBuffer(testPoint1));
+    }
+
+    /**
+     * Test that a request for the searched area in a search frame returns a non-empty geometry.
+     */
+    @Test
+    public void testSearchedBufferGeometry() throws SQLException, ParseException {
+        Point testPoint = geoFactory.createPoint(new Coordinate(0, 0));
+        dbInterface.insertSearchedBuffer(testPoint,10);
+
+        Geometry bufferGeom = dbInterface.selectSearchedBuffer(searchFrame);
+        assertTrue("Whole search frame should be included in buffer", bufferGeom.getArea() == searchFrame.getArea());
+    }
+
+    /**
+     * Test that the returned geometry accounts for unions of multiple search buffers properly.
+     */
+    @Test
+    public void testSearchBufferGeometryMultiple() throws SQLException, ParseException {
+        Point testPoint0 = geoFactory.createPoint(new Coordinate(0, 0));
+        Point testPoint1 = geoFactory.createPoint(new Coordinate(2, 2));
+
+        dbInterface.insertSearchedBuffer(testPoint0,3);
+        dbInterface.insertSearchedBuffer(testPoint1,2);
+
+        Geometry bufferGeom = dbInterface.selectSearchedBuffer(searchFrame);
+
+        assertTrue("buffer area should be no higher than search frame area!", bufferGeom.getArea() <= searchFrame.getArea());
+        assertTrue("buffer area might be missing a polygon", bufferGeom.getArea() > Math.PI*3*3);
+    }
+
+    /**
+     * When no part of the searched buffer intersects the search frame, the result should be empty, wich is
+     * is indicated by returning null.
+     */
+    @Test
+    public void testEmptySearchedBufferGeometry() throws SQLException, ParseException {
+        /*inserts searched buffer that does not intersect search frame*/
+        Point testPoint = geoFactory.createPoint(new Coordinate(100, 100));
+        dbInterface.insertSearchedBuffer(testPoint,1);
+
+        Geometry bufferGeom = dbInterface.selectSearchedBuffer(searchFrame);
+        assertNull(bufferGeom);
     }
 }
