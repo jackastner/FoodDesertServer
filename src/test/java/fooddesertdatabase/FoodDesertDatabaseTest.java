@@ -211,7 +211,7 @@ public class FoodDesertDatabaseTest {
         dbInterface.insertSearchedBuffer(testPoint,1);
 
         Geometry bufferGeom = dbInterface.selectSearchedBuffer(searchFrame);
-        assertNull(bufferGeom);
+        assertTrue(bufferGeom.isEmpty());
     }
 
     /**
@@ -225,7 +225,7 @@ public class FoodDesertDatabaseTest {
 
         Geometry bufferGeom = dbInterface.selectUnsearchedBuffer(searchFrame);
 
-        assertNotNull(bufferGeom);
+        assertFalse(bufferGeom.isEmpty());
         assertTrue(bufferGeom.getArea() < searchFrame.getArea());
     }
 
@@ -240,7 +240,7 @@ public class FoodDesertDatabaseTest {
         Geometry unsearchedBuffer = dbInterface.selectUnsearchedBuffer(searchFrame);
         Geometry searchedBuffer = dbInterface.selectSearchedBuffer(searchFrame);
 
-        assertEquals(0, unsearchedBuffer.intersection(searchedBuffer).getArea(), 0.0001);
+        assertEquals(0.0, unsearchedBuffer.intersection(searchedBuffer).getArea(),0.0);
         assertTrue(unsearchedBuffer.disjoint(searchedBuffer) || unsearchedBuffer.touches(searchedBuffer));
     }
 }

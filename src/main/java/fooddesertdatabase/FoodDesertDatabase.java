@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKTReader;
@@ -77,6 +78,10 @@ public class FoodDesertDatabase implements AutoCloseable {
     /* This is the connection used to access the database */
     private final Connection connection;
 
+    /* Most geometry construction is handled by geomReader but there are some cases
+     * where this class needs to build a Geometry directly. */
+    private final GeometryFactory geoFactory;
+
     /**
      * Opens a connection and constructs an interface for accessing the database in
      * dbFile. This should only be called on a database that was created by a call
@@ -86,6 +91,8 @@ public class FoodDesertDatabase implements AutoCloseable {
      * @throws SQLException
      */
     public FoodDesertDatabase(String dbFile) throws SQLException {
+        this.geoFactory = new GeometryFactory();
+
         SQLiteConfig config = new SQLiteConfig();
         config.enableLoadExtension(true);
         this.connection = DriverManager.getConnection("jdbc:sqlite:" + dbFile, config.toProperties());
@@ -100,6 +107,8 @@ public class FoodDesertDatabase implements AutoCloseable {
      * @throws SQLException
      */
     private FoodDesertDatabase(Connection spatialiteConnection) throws SQLException {
+        this.geoFactory = new GeometryFactory();
+
         this.connection = spatialiteConnection;
         initSpatiaLite();
     }
@@ -300,11 +309,10 @@ public class FoodDesertDatabase implements AutoCloseable {
 
     /**
      * Select from the database the area within the search frame that is also within the area that has been searched
-     * for grocery store. If the area is empty, this method returns null.
+     * for grocery store.
      *
      * @param searchFrame Area being compared with the searched area
-     * @return Geometry containing the intersection of searchFrame and the grocery store searched area or null of this
-     *         Geometry would be empty.
+     * @return Geometry containing the intersection of searchFrame and the grocery store searched area.
      */
     public Geometry selectSearchedBuffer(Geometry searchFrame) throws SQLException, ParseException {
         String sql =
@@ -319,11 +327,10 @@ public class FoodDesertDatabase implements AutoCloseable {
 
     /**
      * Select from the database the area within the search frame that is NOT within the area that has been searched for
-     * grocery stores. If the area is empty, this method returns null.
+     * grocery stores.
      *
      * @param searchFrame Area being compared with the searched area.
-     * @return Geometry containing the difference between the search frame and the searched area or null if this area is
-     *         empty.
+     * @return Geometry containing the difference between the search frame and the searched area.
      */
     public Geometry selectUnsearchedBuffer(Geometry searchFrame) throws SQLException, ParseException {
         String sql =
@@ -340,7 +347,7 @@ public class FoodDesertDatabase implements AutoCloseable {
      * A utility function to execute a database query where the result set will contain exactly 1 geometry.
      * @param sql The SQL query to be executed. This string can (should) be intended for use as a prepared statement.
      * @param args Arguments that wil passed through to the SQL query as string arguments to a prepared statement.
-     * @return The single geometry returned by the query or, null if the geometry would be an empty geometry.
+     * @return The single geometry returned by the query.
      * @throws SQLException Thrown when the result set is empty of and exception is thrown by JDBC
      */
     private Geometry querySingleGeometryResult(String sql, String... args) throws SQLException, ParseException {
@@ -354,7 +361,7 @@ public class FoodDesertDatabase implements AutoCloseable {
 
                  /* It appears that when a result geometry is empty, the WKT returned by SpatiaLite is null */
                  if(resultWKT == null){
-                     return null;
+                     return geoFactory.createGeometryCollection();
                  } else {
                      return geomReader.get().read(resultWKT);
                  }
