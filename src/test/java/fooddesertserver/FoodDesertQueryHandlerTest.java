@@ -16,8 +16,6 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.GeometryFactory;
-import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.io.ParseException;
 
 import com.google.maps.errors.ApiException;
@@ -31,8 +29,8 @@ public class FoodDesertQueryHandlerTest {
     private static String googleApiKey;
 
     private FoodDesertQueryHandler queryHandler;
-    private Point collegePark;
-    private Point nullPoint;
+    private Coordinate collegePark;
+    private Coordinate nullPoint;
 
     @BeforeClass
     public static void openDB() throws SQLException, IOException {
@@ -67,10 +65,9 @@ public class FoodDesertQueryHandlerTest {
         GooglePlacesClient placeClient = new GooglePlacesClient(googleApiKey);
         queryHandler = new FoodDesertQueryHandler(dbInterface, placeClient);
 
-        GeometryFactory geoFact = new GeometryFactory();
         /*construct points as (lng,lat)*/
-        collegePark = geoFact.createPoint(new Coordinate(-76.927, 38.996));
-        nullPoint = geoFact.createPoint(new Coordinate(0, 0));
+        collegePark = new Coordinate(-76.927, 38.996);
+        nullPoint = new Coordinate(0, 0);
     }
 
     /**

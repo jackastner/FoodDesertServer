@@ -4,7 +4,9 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
 
+import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.io.ParseException;
 
@@ -25,10 +27,12 @@ public class FoodDesertQueryHandler {
 
     private final FoodDesertDatabase foodDb;
     private final GooglePlacesClient placesClient;
+    private final GeometryFactory geoFactory;
 
     public FoodDesertQueryHandler(FoodDesertDatabase foodDb, GooglePlacesClient placesClient) {
         this.foodDb = foodDb;
         this.placesClient = placesClient;
+        this.geoFactory = new GeometryFactory();
     }
 
     /**
@@ -36,7 +40,7 @@ public class FoodDesertQueryHandler {
      * the local database and the google places API. New data obtained from the places
      * API is added to the database.
      */
-    public boolean isInFoodDesert(Point p) throws SQLException, ParseException, ApiException, InterruptedException, IOException {
+    public boolean isInFoodDesert(Coordinate p) throws SQLException, ParseException, ApiException, InterruptedException, IOException {
         if(!foodDb.inSearchedBuffer(p)) {
             /*call to places API and update database*/
             double bufferRadius = getBufferRadiusMeters(p);
@@ -52,9 +56,10 @@ public class FoodDesertQueryHandler {
      * This function assumes that data has been collected for that point so, it does
      * not check the search buffer or make a call to the Places API.
      */
-    private boolean isInFoodDesertUnchecked(Point p) throws SQLException, ParseException {
+    private boolean isInFoodDesertUnchecked(Coordinate p) throws SQLException, ParseException {
         double bufferRadius = getBufferRadiusDegrees(p);
-        Geometry buffer = p.buffer(bufferRadius);
+        Point coordPoint = geoFactory.createPoint(p);
+        Geometry buffer = coordPoint.buffer(bufferRadius);
         List<GroceryStore> stores = foodDb.selectStore(buffer);
         return stores.isEmpty();
     }
@@ -70,7 +75,7 @@ public class FoodDesertQueryHandler {
      * getBufferRadiusMeters returns this radius in meters so, it should be used
      * to when talking to the Place API or other code that uses Web Mercator
      */
-    private double getBufferRadiusMeters(Point p) {
+    private double getBufferRadiusMeters(Coordinate p) {
         final double METERS_IN_MILE = 1609.34;
         return METERS_IN_MILE;
     }
@@ -86,7 +91,7 @@ public class FoodDesertQueryHandler {
      * getBufferRadiusDegrees this radius in decimal degrees so, it should be
      * used when talking to code such as the SpatiaLite Database that uses WGS84.
      */
-    private double getBufferRadiusDegrees(Point p) {
+    private double getBufferRadiusDegrees(Coordinate p) {
         double radiusMeters = getBufferRadiusMeters(p);
         /*this is a fairly rough estimate, see: https://gis.stackexchange.com/a/2964/85520*/
         final double DEGREES_IN_METER = 1.0/111_111.0;

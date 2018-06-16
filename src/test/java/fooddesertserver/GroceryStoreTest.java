@@ -5,17 +5,14 @@ import static org.junit.Assert.*;
 import org.junit.Before;
 import org.junit.Test;
 import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.GeometryFactory;
-import org.locationtech.jts.geom.Point;
 
 public class GroceryStoreTest {
 
-    private Point testPoint;
+    private Coordinate testPoint;
 
     @Before
     public void setup() {
-        GeometryFactory geoFactory = new GeometryFactory();
-        testPoint = geoFactory.createPoint(new Coordinate(0, 0));
+        testPoint = new Coordinate(0, 0);
     }
 
     /**

@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
@@ -182,8 +183,9 @@ public class FoodDesertDatabase implements AutoCloseable {
             "VALUES ( ? , GeomFromText(? , " + EPGS + "));";
 
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            Point coordPoint = geoFactory.createPoint(store.getLocation());
             stmt.setString(1, store.getName());
-            stmt.setString(2, store.getLocation().toText());
+            stmt.setString(2, coordPoint.toText());
 
             try {
                 stmt.executeUpdate();
@@ -257,7 +259,7 @@ public class FoodDesertDatabase implements AutoCloseable {
                 String locationWKT = selected.getString(3);
                 Point location = (Point) geomReader.get().read(locationWKT);
 
-                selectedStores.add(new GroceryStore(id, name, location));
+                selectedStores.add(new GroceryStore(id, name, location.getCoordinate()));
             }
         }
         return selectedStores;
@@ -270,12 +272,13 @@ public class FoodDesertDatabase implements AutoCloseable {
      * @param radius Distance around the center that was searched.
      * @throws SQLException
      */
-    public void insertSearchedBuffer(Point searched, double radius) throws SQLException {
+    public void insertSearchedBuffer(Coordinate searched, double radius) throws SQLException {
         String sql =
             "INSERT INTO " + SEARCHED_TABLE + " ( " + SEARCHED_BUFFER_COLUMN + ") " +
             "VALUES (GeomFromText(? , " + EPGS + "));";
 
-        Geometry buffer = searched.buffer(radius);
+        Point coordPoint = geoFactory.createPoint(searched);
+        Geometry buffer = coordPoint.buffer(radius);
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             stmt.setString(1, buffer.toText());
             stmt.executeUpdate();
@@ -289,14 +292,15 @@ public class FoodDesertDatabase implements AutoCloseable {
      * @return True if query is contained within the searched area
      * @throws SQLException
      */
-    public boolean inSearchedBuffer(Point query) throws SQLException {
+    public boolean inSearchedBuffer(Coordinate query) throws SQLException {
         String sql =
             "SELECT count(*) " +
             "FROM searched_area " +
             "WHERE CONTAINS(searched_area.buffer, GeomFromText(?)) = 1;";
 
+        Point coordPoint = geoFactory.createPoint(query);
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setString(1, query.toText());
+            stmt.setString(1, coordPoint.toText());
             ResultSet result = stmt.executeQuery();
             if(result.next()) {
                 int count = result.getInt(1);

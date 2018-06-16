@@ -15,7 +15,6 @@ import org.junit.Test;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
-import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.io.ParseException;
 
 import fooddesertserver.GroceryStore;
@@ -26,7 +25,6 @@ public class FoodDesertDatabaseTest {
 
     private static FoodDesertDatabase dbInterface;
 
-    private GeometryFactory geoFactory;
     private GroceryStore testStoreName;
     private GroceryStore testStoreNullName;
     private Geometry searchFrame;
@@ -52,10 +50,10 @@ public class FoodDesertDatabaseTest {
     public void setupDB() throws SQLException {
         dbInterface.truncate();
 
-        geoFactory = new GeometryFactory();
-        testStoreName = new GroceryStore("test", geoFactory.createPoint(new Coordinate(0, 0)));
-        testStoreNullName = new GroceryStore(null, geoFactory.createPoint(new Coordinate(1, 1)));
+        testStoreName = new GroceryStore("test", new Coordinate(0, 0));
+        testStoreNullName = new GroceryStore(null, new Coordinate(1, 1));
 
+        GeometryFactory geoFactory = new GeometryFactory();
         searchFrame = geoFactory.createPolygon(new Coordinate[] {
                 new Coordinate(-5, -5),
                 new Coordinate( 5, -5),
@@ -152,7 +150,7 @@ public class FoodDesertDatabaseTest {
      */
     @Test
     public void testInSearchedBuffer() throws SQLException {
-        Point testPoint = geoFactory.createPoint(new Coordinate(0, 0));
+        Coordinate testPoint = new Coordinate(0, 0);
 
         dbInterface.insertSearchedBuffer(testPoint,10);
         assertTrue(dbInterface.inSearchedBuffer(testPoint));
@@ -164,8 +162,8 @@ public class FoodDesertDatabaseTest {
      */
     @Test
     public void testNotInSearchedBuffer() throws SQLException {
-        Point testPoint0 = geoFactory.createPoint(new Coordinate(0, 0));
-        Point testPoint1 = geoFactory.createPoint(new Coordinate(100, 100));
+        Coordinate testPoint0 = new Coordinate(0, 0);
+        Coordinate testPoint1 = new Coordinate(100, 100);
 
         dbInterface.insertSearchedBuffer(testPoint0,10);
         assertFalse(dbInterface.inSearchedBuffer(testPoint1));
@@ -176,7 +174,7 @@ public class FoodDesertDatabaseTest {
      */
     @Test
     public void testSearchedBufferGeometry() throws SQLException, ParseException {
-        Point testPoint = geoFactory.createPoint(new Coordinate(0, 0));
+        Coordinate testPoint = new Coordinate(0, 0);
         dbInterface.insertSearchedBuffer(testPoint,10);
 
         Geometry bufferGeom = dbInterface.selectSearchedBuffer(searchFrame);
@@ -188,8 +186,8 @@ public class FoodDesertDatabaseTest {
      */
     @Test
     public void testSearchBufferGeometryMultiple() throws SQLException, ParseException {
-        Point testPoint0 = geoFactory.createPoint(new Coordinate(0, 0));
-        Point testPoint1 = geoFactory.createPoint(new Coordinate(2, 2));
+        Coordinate testPoint0 = new Coordinate(0, 0);
+        Coordinate testPoint1 = new Coordinate(2, 2);
 
         dbInterface.insertSearchedBuffer(testPoint0,3);
         dbInterface.insertSearchedBuffer(testPoint1,2);
@@ -207,7 +205,7 @@ public class FoodDesertDatabaseTest {
     @Test
     public void testEmptySearchedBufferGeometry() throws SQLException, ParseException {
         /*inserts searched buffer that does not intersect search frame*/
-        Point testPoint = geoFactory.createPoint(new Coordinate(100, 100));
+        Coordinate testPoint = new Coordinate(100, 100);
         dbInterface.insertSearchedBuffer(testPoint,1);
 
         Geometry bufferGeom = dbInterface.selectSearchedBuffer(searchFrame);
@@ -220,7 +218,7 @@ public class FoodDesertDatabaseTest {
      */
     @Test
     public void testUnsearchedGeometry() throws SQLException, ParseException {
-        Point testPoint = geoFactory.createPoint(new Coordinate(0, 0));
+        Coordinate testPoint = new Coordinate(0, 0);
         dbInterface.insertSearchedBuffer(testPoint, 2);
 
         Geometry bufferGeom = dbInterface.selectUnsearchedBuffer(searchFrame);
@@ -234,7 +232,7 @@ public class FoodDesertDatabaseTest {
      */
     @Test
     public void testDisjointSearchedUnsearched() throws SQLException, ParseException {
-        Point testPoint = geoFactory.createPoint(new Coordinate(0, 0));
+        Coordinate testPoint = new Coordinate(0, 0);
         dbInterface.insertSearchedBuffer(testPoint, 2);
 
         Geometry unsearchedBuffer = dbInterface.selectUnsearchedBuffer(searchFrame);

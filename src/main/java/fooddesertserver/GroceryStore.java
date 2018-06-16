@@ -1,6 +1,6 @@
 package fooddesertserver;
 
-import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.geom.Coordinate;
 
 /**
  * @author john
@@ -19,7 +19,7 @@ public class GroceryStore {
     private final String name;
 
     // should not be null
-    private final Point location;
+    private final Coordinate location;
 
     /**
      * @param id
@@ -32,7 +32,7 @@ public class GroceryStore {
      *            The coordinates of this store. This value cannot be null and an
      *            IllegalArgumentException is thrown if it is.
      */
-    public GroceryStore(int id, String name, Point location) {
+    public GroceryStore(int id, String name, Coordinate location) {
         if (location == null) {
             throw new IllegalArgumentException("GroceryStore cannot be constructed with a null location!");
         }
@@ -45,7 +45,7 @@ public class GroceryStore {
      * This constructor is identical to the previous but, the id of this store is
      * initialized to a default value (-1).
      */
-    public GroceryStore(String name, Point location) {
+    public GroceryStore(String name, Coordinate location) {
         this(-1, name, location);
     }
 
@@ -88,7 +88,7 @@ public class GroceryStore {
      *         store with unknown coordinates is not meaningful in the food desert
      *         database. This property is ensured in the constructor.
      */
-    public Point getLocation() {
+    public Coordinate getLocation() {
         return location;
     }
 
@@ -113,6 +113,6 @@ public class GroceryStore {
 
     @Override
     public String toString() {
-        return String.format("GroceryStore: {id = %d, name = %s, location = %s}", id, name, location.toText());
+        return String.format("GroceryStore: {id = %d, name = %s, location = %s}", id, name, location.toString());
     }
 }

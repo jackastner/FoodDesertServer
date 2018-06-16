@@ -12,8 +12,6 @@ import java.sql.SQLException;
 import java.util.Properties;
 
 import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.GeometryFactory;
-import org.locationtech.jts.geom.Point;
 
 import fooddesertdatabase.FoodDesertDatabase;
 import googleplacesclient.GooglePlacesClient;
@@ -28,15 +26,12 @@ public class FoodDesertServer {
     }
 
     private static void setupRoutes(FoodDesertQueryHandler queryHandler) {
-        /*used to build points for url parameters*/
-        GeometryFactory geoFactory = new GeometryFactory();
-
         staticFiles.location("/public");
 
         get("/is_in_food_desert", (request, response) -> {
             double lng = Double.parseDouble(request.queryParams("lng"));
             double lat = Double.parseDouble(request.queryParams("lat"));
-            Point location = geoFactory.createPoint(new Coordinate(lng,lat));
+            Coordinate location = new Coordinate(lng,lat);
             boolean isInFoodDesert = queryHandler.isInFoodDesert(location);
             return String.valueOf(isInFoodDesert);
         });

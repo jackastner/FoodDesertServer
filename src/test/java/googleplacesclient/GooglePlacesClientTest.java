@@ -13,8 +13,6 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.GeometryFactory;
-import org.locationtech.jts.geom.Point;
 
 import com.google.maps.errors.ApiException;
 
@@ -25,8 +23,8 @@ public class GooglePlacesClientTest {
     private static String googleApiKey;
 
     private GooglePlacesClient placeClient;
-    private Point collegePark;
-    private Point nullPoint;
+    private Coordinate collegePark;
+    private Coordinate nullPoint;
 
     @BeforeClass
     public static void getApiKey() throws IOException {
@@ -39,12 +37,11 @@ public class GooglePlacesClientTest {
 
     @Before
     public void setupPlaceClient() {
-        GeometryFactory geoFact = new GeometryFactory();
         placeClient = new GooglePlacesClient(googleApiKey);
 
         /*construct points as (lng,lat)*/
-        collegePark = geoFact.createPoint(new Coordinate(-76.927, 38.996));
-        nullPoint = geoFact.createPoint(new Coordinate(0, 0));
+        collegePark = new Coordinate(-76.927, 38.996);
+        nullPoint = new Coordinate(0, 0);
     }
 
     /* Just test that a request can be made to the API without an exception being

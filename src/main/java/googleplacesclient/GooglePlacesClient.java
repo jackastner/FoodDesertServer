@@ -5,8 +5,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.GeometryFactory;
-import org.locationtech.jts.geom.Point;
 
 import com.google.maps.GeoApiContext;
 import com.google.maps.NearbySearchRequest;
@@ -35,17 +33,10 @@ public class GooglePlacesClient {
 
     private final GeoApiContext context;
 
-    /* Factory used to construct points for grocery stores
-     * I *think* this class is thread safe so, I'm not wrapping it
-     * in a ThreadLocal. If weird issues start showing up this
-     * could be why. */
-    private final GeometryFactory geoFactory;
-
     /* Since this class talks to the Google Places API, an API key is needed to
      * instantiate it. A key can be obtained from */
     public GooglePlacesClient(String googleApiKey) {
         context = new GeoApiContext.Builder().apiKey(googleApiKey).build();
-        geoFactory = new GeometryFactory();
     }
 
     /**
@@ -57,13 +48,13 @@ public class GooglePlacesClient {
      * @param radius Radius in meters around the query point to search for grocery stores.
      * @return A list of up to 60 grocery stores found in that area.
      */
-    public List<GroceryStore> nearbyQueryFor(Point location, int radius)
+    public List<GroceryStore> nearbyQueryFor(Coordinate location, int radius)
             throws ApiException, InterruptedException, IOException {
         // initialize to size 60 because the places API returns max 60 results
         List<GroceryStore> results = new ArrayList<>(60);
 
         // prepare initial query for Places API
-        NearbySearchRequest request = PlacesApi.nearbySearchQuery(this.context, pointToLatLng(location));
+        NearbySearchRequest request = PlacesApi.nearbySearchQuery(this.context, coordinateToLatLng(location));
         PlacesSearchResponse response = request.radius(radius).type(PlaceType.GROCERY_OR_SUPERMARKET).await();
 
         fillResultsList(response, results);
@@ -79,7 +70,7 @@ public class GooglePlacesClient {
         // Gather results of the query into the results List
         for (PlacesSearchResult result : response.results) {
             //name and location of the store are obtained from the API query
-            Point storeLocation = latLngToPoint(result.geometry.location);
+            Coordinate storeLocation = latLngToCoordinate(result.geometry.location);
             String name = result.name;
             //the store is constructed without an id because it is not currently in a DB
             GroceryStore store = new GroceryStore(name, storeLocation);
@@ -102,13 +93,13 @@ public class GooglePlacesClient {
     }
 
     /*Create a JTS point for a LatLng obtained from the Places API*/
-    private Point latLngToPoint(LatLng latLng) {
+    private Coordinate latLngToCoordinate(LatLng latLng) {
         /*JTS expects coords at (lng,lat)*/
-        return geoFactory.createPoint(new Coordinate(latLng.lng, latLng.lat));
+        return new Coordinate(latLng.lng, latLng.lat);
     }
 
     /*Create a LatLng for use in the Place API from a JTS Point */
-    private LatLng pointToLatLng(Point p) {
-        return new LatLng(p.getY(), p.getX());
+    private LatLng coordinateToLatLng(Coordinate p) {
+        return new LatLng(p.y, p.x);
     }
 }
