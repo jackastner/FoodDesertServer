@@ -180,7 +180,7 @@ public class FoodDesertDatabaseTest {
         dbInterface.insertSearchedBuffer(testPoint,10);
 
         Geometry bufferGeom = dbInterface.selectSearchedBuffer(searchFrame);
-        assertTrue("Whole search frame should be included in buffer", bufferGeom.getArea() == searchFrame.getArea());
+        assertEquals("Whole search frame should be included in buffer", bufferGeom.getArea(), searchFrame.getArea(), 0.0);
     }
 
     /**

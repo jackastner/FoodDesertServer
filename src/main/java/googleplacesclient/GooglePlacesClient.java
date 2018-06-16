@@ -39,7 +39,7 @@ public class GooglePlacesClient {
      * I *think* this class is thread safe so, I'm not wrapping it
      * in a ThreadLocal. If weird issues start showing up this
      * could be why. */
-    private GeometryFactory geoFactory;
+    private final GeometryFactory geoFactory;
 
     /* Since this class talks to the Google Places API, an API key is needed to
      * instantiate it. A key can be obtained from */

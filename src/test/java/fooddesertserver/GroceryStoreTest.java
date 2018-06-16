@@ -10,12 +10,11 @@ import org.locationtech.jts.geom.Point;
 
 public class GroceryStoreTest {
 
-    private GeometryFactory geoFactory;
     private Point testPoint;
 
     @Before
     public void setup() {
-        geoFactory = new GeometryFactory();
+        GeometryFactory geoFactory = new GeometryFactory();
         testPoint = geoFactory.createPoint(new Coordinate(0, 0));
     }
 
@@ -52,7 +51,7 @@ public class GroceryStoreTest {
     public void noName() {
         GroceryStore store = new GroceryStore(1, null, testPoint);
         assertFalse(store.hasName());
-        assertEquals(null, store.getName());
+        assertNull(store.getName());
     }
 
     /**

@@ -72,11 +72,7 @@ public class FoodDesertDatabase implements AutoCloseable {
      * field ThreadLocal. Consider removing this if WKTReader is thread safe or
      * using synchronization instead of ThreadSafe.
      */
-    private static final ThreadLocal<WKTReader> geomReader = new ThreadLocal<WKTReader>() {
-        protected WKTReader initialValue() {
-            return new WKTReader();
-        }
-    };
+    private static final ThreadLocal<WKTReader> geomReader = ThreadLocal.withInitial(WKTReader::new);
 
     /* This is the connection used to access the database */
     private final Connection connection;

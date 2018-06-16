@@ -3,7 +3,6 @@ package fooddesertserver;
 import static spark.Spark.*;
 
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -23,8 +22,8 @@ public class FoodDesertServer {
 
     private static void printUsage() {
         System.out.println("Usage: java -jar FoodDesertServer.jar database_file [google_api_key]");
-        System.out.println("\tdatabase_file: sqlite database file containing tables created by this server");
-        System.out.println("\tgoogle_api_key: a valid key for the Google Places API. If ommited, this\n\t\tprogram will look for a Java properites file containing a key value pair:");
+        System.out.println("\tdatabase_file: SqLite database file containing tables created by this server.");
+        System.out.println("\tgoogle_api_key: a valid key for the Google Places API. If omitted, this\n\t\tprogram will look for a Java properties file containing a key value pair:");
         System.out.println("\t\tgoogle_api_key=$YOUR_API_KEY");
     }
 
@@ -43,7 +42,7 @@ public class FoodDesertServer {
         });
     }
 
-    public static void main(String[] args) throws FileNotFoundException, IOException, SQLException {
+    public static void main(String[] args) throws IOException, SQLException {
         if(args.length < 1) {
             printUsage();
             return;

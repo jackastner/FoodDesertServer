@@ -1,4 +1,4 @@
-package googleplaceclient;
+package googleplacesclient;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -19,7 +19,6 @@ import org.locationtech.jts.geom.Point;
 import com.google.maps.errors.ApiException;
 
 import fooddesertserver.GroceryStore;
-import googleplacesclient.GooglePlacesClient;
 
 public class GooglePlacesClientTest {
 
@@ -73,7 +72,6 @@ public class GooglePlacesClientTest {
     @Test
     public void requestReturnsResults() throws ApiException, InterruptedException, IOException {
         List<GroceryStore> results = placeClient.nearbyQueryFor(collegePark, 10 * 1600);
-        System.out.println(results);
         assertFalse(results.isEmpty());
     }
 

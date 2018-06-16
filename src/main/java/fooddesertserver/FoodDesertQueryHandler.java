@@ -42,7 +42,7 @@ public class FoodDesertQueryHandler {
             double bufferRadius = getBufferRadiusMeters(p);
             List<GroceryStore> stores = placesClient.nearbyQueryFor(p, (int) bufferRadius);
             foodDb.insertAll(stores);
-            foodDb.insertSearchedBuffer(p, getBufferRadiusDegress(p));
+            foodDb.insertSearchedBuffer(p, getBufferRadiusDegrees(p));
         }
         return isInFoodDesertUnchecked(p);
     }
@@ -53,7 +53,7 @@ public class FoodDesertQueryHandler {
      * not check the search buffer or make a call to the Places API.
      */
     private boolean isInFoodDesertUnchecked(Point p) throws SQLException, ParseException {
-        double bufferRadius = getBufferRadiusDegress(p);
+        double bufferRadius = getBufferRadiusDegrees(p);
         Geometry buffer = p.buffer(bufferRadius);
         List<GroceryStore> stores = foodDb.selectStore(buffer);
         return stores.isEmpty();
@@ -83,10 +83,10 @@ public class FoodDesertQueryHandler {
      * The current implementation returns a constant size buffer of 1 mile but,
      * future implementations should generate it dynamically based on location.
      *
-     * getBufferRadiusDegres returns this radius in decimal degrees so, it should be
+     * getBufferRadiusDegrees this radius in decimal degrees so, it should be
      * used when talking to code such as the SpatiaLite Database that uses WGS84.
      */
-    private double getBufferRadiusDegress(Point p) {
+    private double getBufferRadiusDegrees(Point p) {
         double radiusMeters = getBufferRadiusMeters(p);
         /*this is a fairly rough estimate, see: https://gis.stackexchange.com/a/2964/85520*/
         final double DEGREES_IN_METER = 1.0/111_111.0;
