@@ -213,4 +213,34 @@ public class FoodDesertDatabaseTest {
         Geometry bufferGeom = dbInterface.selectSearchedBuffer(searchFrame);
         assertNull(bufferGeom);
     }
+
+    /**
+     * Test that the area of the unsearched geometry is less than the area of the original search frame when
+     * the searched geometry intersects the search frame.
+     */
+    @Test
+    public void testUnsearchedGeometry() throws SQLException, ParseException {
+        Point testPoint = geoFactory.createPoint(new Coordinate(0, 0));
+        dbInterface.insertSearchedBuffer(testPoint, 2);
+
+        Geometry bufferGeom = dbInterface.selectUnsearchedBuffer(searchFrame);
+
+        assertNotNull(bufferGeom);
+        assertTrue(bufferGeom.getArea() < searchFrame.getArea());
+    }
+
+    /**
+     * Test that a searched buffer and matching unsearched buffer do not intersect (but they can touch).
+     */
+    @Test
+    public void testDisjointSearchedUnsearched() throws SQLException, ParseException {
+        Point testPoint = geoFactory.createPoint(new Coordinate(0, 0));
+        dbInterface.insertSearchedBuffer(testPoint, 2);
+
+        Geometry unsearchedBuffer = dbInterface.selectUnsearchedBuffer(searchFrame);
+        Geometry searchedBuffer = dbInterface.selectSearchedBuffer(searchFrame);
+
+        assertEquals(0, unsearchedBuffer.intersection(searchedBuffer).getArea(), 0.0001);
+        assertTrue(unsearchedBuffer.disjoint(searchedBuffer) || unsearchedBuffer.touches(searchedBuffer));
+    }
 }

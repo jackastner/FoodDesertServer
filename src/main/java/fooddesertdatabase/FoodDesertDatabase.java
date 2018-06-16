@@ -281,6 +281,7 @@ public class FoodDesertDatabase implements AutoCloseable {
     /**
      * Select from the database the area within the search frame that is also within the area that has been searched
      * for grocery store. If the area is empty, this method returns null.
+     *
      * @param searchFrame Area being compared with the searched area
      * @return Geometry containing the intersection of searchFrame and the grocery store searched area or null of this
      *         Geometry would be empty.
@@ -290,26 +291,53 @@ public class FoodDesertDatabase implements AutoCloseable {
                      SEARCHED_ID_COLUMN + " IN (SELECT ROWID FROM SpatialIndex WHERE " +
                      "f_table_name = '" + SEARCHED_TABLE + "' AND search_frame = GeomFromText(?));";
 
-        try(PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setString(1, searchFrame.toText());
-            stmt.setString(2, searchFrame.toText());
+        String searchFrameWKT = searchFrame.toText();
+        return querySingleGeometryResult(sql, searchFrameWKT, searchFrameWKT);
+    }
 
-            ResultSet result = stmt.executeQuery();
-            if(result.next()) {
-                String unionWKT = result.getString(1);
+    /**
+     * Select from the database the area within the search frame that is NOT within the area that has been searched for
+     * grocery stores. If the area is empty, this method returns null.
+     *
+     * @param searchFrame Area being compared with the searched area.
+     * @return Geometry containing the difference between the search frame and the searched area or null if this area is
+     *         empty.
+     */
+    public Geometry selectUnsearchedBuffer(Geometry searchFrame) throws SQLException, ParseException {
+        String sql = "SELECT AsText(ST_Difference(GeomFromText(?), ST_Union(" + SEARCHED_BUFFER_COLUMN + "))) FROM " + SEARCHED_TABLE + " WHERE " +
+                     SEARCHED_ID_COLUMN + " IN (SELECT ROWID FROM SpatialIndex WHERE " +
+                     "f_table_name = '" + SEARCHED_TABLE + "' AND search_frame = GeomFromText(?));";
 
-                /* When the searched frame does not contain any part of the searched buffer,
-                 * the the result string from SpatiaLite is null. */
-                if(unionWKT == null){
-                    return null;
-                } else {
-                    return geomReader.get().read(unionWKT);
-                }
-            } else {
+        String searchFrameWKT = searchFrame.toText();
+        return querySingleGeometryResult(sql, searchFrameWKT, searchFrameWKT);
+    }
+
+    /**
+     * A utility function to execute a database query where the result set will contain exactly 1 geometry.
+     * @param sql The SQL query to be executed. This string can (should) be intended for use as a prepared statement.
+     * @param args Arguments that wil passed through to the SQL query as string arguments to a prepared statement.
+     * @return The single geometry returned by the query or, null if the geometry would be an empty geometry.
+     * @throws SQLException Thrown when the result set is empty of and exception is thrown by JDBC
+     */
+    private Geometry querySingleGeometryResult(String sql, String... args) throws SQLException, ParseException {
+         try(PreparedStatement stmt = connection.prepareStatement(sql)) {
+             for(int i = 0; i < args.length; i++){
+                 stmt.setString(i+1, args[i]);
+             }
+             ResultSet result = stmt.executeQuery();
+             if(result.next()) {
+                 String resultWKT = result.getString(1);
+
+                 /* It appears that when a result geometry is empty, the WKT returned by SpatiaLite is null */
+                 if(resultWKT == null){
+                     return null;
+                 } else {
+                     return geomReader.get().read(resultWKT);
+                 }
+             } else {
                 throw new SQLException("A query that should always return a result did not return anything!");
             }
         }
-
     }
 
     /**
