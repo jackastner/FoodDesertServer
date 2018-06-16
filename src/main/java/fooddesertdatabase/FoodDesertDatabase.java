@@ -41,6 +41,21 @@ public class FoodDesertDatabase implements AutoCloseable {
 
     private static final String EPGS = "4326";
 
+    /**
+     * Construct a common subquery used when working with a SpatiaLite spatial index.
+     * The constructed subquery will select ids from the provided table such that the geometries
+     * of the associated rows intersect the search frame provided as an argument to an SQL prepared statement.
+     * @param indexedTable Geometry table to be queried.
+     * @return An SQL query to be used in a prepared statement that expects a WKT encoded search frame to be inserted
+     *         as it's prepared statement parameter.
+     */
+    private static String spatialIndexSubQuery(String indexedTable){
+        return "SELECT ROWID " +
+               "FROM SpatialIndex " +
+               "WHERE f_table_name = '" + indexedTable + "' " +
+               "  AND search_frame = GeomFromText(?));";
+    }
+
     /* Loads SqLite database connection */
     static {
         try {
@@ -157,8 +172,10 @@ public class FoodDesertDatabase implements AutoCloseable {
             throw new IllegalArgumentException("Store already exists in database!");
         }
 
-        String sql = "INSERT INTO " + GROCERY_TABLE + " ( " + GROCERY_NAME_COLUMN + ", " + GROCERY_LOCATION_COLUMN + ") "
-                + "VALUES ( ? , GeomFromText(? , " + EPGS + "));";
+        String sql =
+            "INSERT INTO " + GROCERY_TABLE + " ( " + GROCERY_NAME_COLUMN + ", " + GROCERY_LOCATION_COLUMN + ") " +
+            "VALUES ( ? , GeomFromText(? , " + EPGS + "));";
+
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             stmt.setString(1, store.getName());
             stmt.setString(2, store.getLocation().toText());
@@ -217,9 +234,11 @@ public class FoodDesertDatabase implements AutoCloseable {
      * @throws ParseException
      */
     public List<GroceryStore> selectStore(Geometry searchFrame) throws SQLException, ParseException {
-        String sql = "SELECT " + GROCERY_ID_COLUMN + ", " + GROCERY_NAME_COLUMN + ", AsText(" + GROCERY_LOCATION_COLUMN + ") FROM "
-                + GROCERY_TABLE + " WHERE " + GROCERY_ID_COLUMN + " IN (SELECT ROWID FROM SpatialIndex "
-                + "WHERE f_table_name = '" + GROCERY_TABLE + "' AND search_frame = GeomFromText(?));";
+        String sql =
+            "SELECT " + GROCERY_ID_COLUMN + ", " + GROCERY_NAME_COLUMN + ", AsText(" + GROCERY_LOCATION_COLUMN + ") " +
+            "FROM " + GROCERY_TABLE + " " +
+            "WHERE " + GROCERY_ID_COLUMN + " IN (" +
+                spatialIndexSubQuery(GROCERY_TABLE) + ");";
 
         List<GroceryStore> selectedStores = new ArrayList<>();
 
@@ -247,8 +266,10 @@ public class FoodDesertDatabase implements AutoCloseable {
      * @throws SQLException
      */
     public void insertSearchedBuffer(Point searched, double radius) throws SQLException {
-        String sql = "INSERT INTO " + SEARCHED_TABLE + " ( " + SEARCHED_BUFFER_COLUMN + ") "
-                   + "VALUES (GeomFromText(? , " + EPGS + "));";
+        String sql =
+            "INSERT INTO " + SEARCHED_TABLE + " ( " + SEARCHED_BUFFER_COLUMN + ") " +
+            "VALUES (GeomFromText(? , " + EPGS + "));";
+
         Geometry buffer = searched.buffer(radius);
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             stmt.setString(1, buffer.toText());
@@ -264,7 +285,10 @@ public class FoodDesertDatabase implements AutoCloseable {
      * @throws SQLException
      */
     public boolean inSearchedBuffer(Point query) throws SQLException {
-        String sql = "SELECT count(*) FROM searched_area WHERE CONTAINS(searched_area.buffer, GeomFromText(?)) = 1;";
+        String sql =
+            "SELECT count(*) " +
+            "FROM searched_area " +
+            "WHERE CONTAINS(searched_area.buffer, GeomFromText(?)) = 1;";
 
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             stmt.setString(1, query.toText());
@@ -287,9 +311,11 @@ public class FoodDesertDatabase implements AutoCloseable {
      *         Geometry would be empty.
      */
     public Geometry selectSearchedBuffer(Geometry searchFrame) throws SQLException, ParseException {
-        String sql = "SELECT AsText(ST_Intersection(GeomFromText(?), ST_Union(" + SEARCHED_BUFFER_COLUMN + "))) FROM " + SEARCHED_TABLE + " WHERE " +
-                     SEARCHED_ID_COLUMN + " IN (SELECT ROWID FROM SpatialIndex WHERE " +
-                     "f_table_name = '" + SEARCHED_TABLE + "' AND search_frame = GeomFromText(?));";
+        String sql =
+            "SELECT AsText(ST_Intersection(GeomFromText(?), ST_Union(" + SEARCHED_BUFFER_COLUMN + "))) " +
+            "FROM " + SEARCHED_TABLE + " " +
+            "WHERE " + SEARCHED_ID_COLUMN + " IN (" +
+                spatialIndexSubQuery(SEARCHED_TABLE) + ");";
 
         String searchFrameWKT = searchFrame.toText();
         return querySingleGeometryResult(sql, searchFrameWKT, searchFrameWKT);
@@ -304,9 +330,11 @@ public class FoodDesertDatabase implements AutoCloseable {
      *         empty.
      */
     public Geometry selectUnsearchedBuffer(Geometry searchFrame) throws SQLException, ParseException {
-        String sql = "SELECT AsText(ST_Difference(GeomFromText(?), ST_Union(" + SEARCHED_BUFFER_COLUMN + "))) FROM " + SEARCHED_TABLE + " WHERE " +
-                     SEARCHED_ID_COLUMN + " IN (SELECT ROWID FROM SpatialIndex WHERE " +
-                     "f_table_name = '" + SEARCHED_TABLE + "' AND search_frame = GeomFromText(?));";
+        String sql =
+            "SELECT AsText(ST_Difference(GeomFromText(?), ST_Union(" + SEARCHED_BUFFER_COLUMN + "))) " +
+            "FROM " + SEARCHED_TABLE + " " +
+            "WHERE " + SEARCHED_ID_COLUMN + " IN (" +
+                spatialIndexSubQuery(SEARCHED_TABLE) + ");";
 
         String searchFrameWKT = searchFrame.toText();
         return querySingleGeometryResult(sql, searchFrameWKT, searchFrameWKT);
