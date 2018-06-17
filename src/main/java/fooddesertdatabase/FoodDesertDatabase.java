@@ -337,14 +337,10 @@ public class FoodDesertDatabase implements AutoCloseable {
      * @return Geometry containing the difference between the search frame and the searched area.
      */
     public Geometry selectUnsearchedBuffer(Geometry searchFrame) throws SQLException, ParseException {
-        String sql =
-            "SELECT AsText(ST_Difference(GeomFromText(?), ST_Union(" + SEARCHED_BUFFER_COLUMN + "))) " +
-            "FROM " + SEARCHED_TABLE + " " +
-            "WHERE " + SEARCHED_ID_COLUMN + " IN (" +
-                spatialIndexSubQuery(SEARCHED_TABLE) + ");";
-
-        String searchFrameWKT = searchFrame.toText();
-        return querySingleGeometryResult(sql, searchFrameWKT, searchFrameWKT);
+        /* Unsearched is defined in terms of searched because I was have issues with empty unions in Spatialite
+         * If this turns out to be to slow, perhaps implement it directly in SQL.*/
+        Geometry searchedBuffer = selectSearchedBuffer(searchFrame);
+        return searchFrame.difference(searchedBuffer);
     }
 
     /**

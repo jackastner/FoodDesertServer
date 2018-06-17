@@ -42,11 +42,7 @@ public class FoodDesertQueryHandler {
      */
     public boolean isInFoodDesert(Coordinate p) throws SQLException, ParseException, ApiException, InterruptedException, IOException {
         if(!foodDb.inSearchedBuffer(p)) {
-            /*call to places API and update database*/
-            double bufferRadius = getBufferRadiusMeters(p);
-            List<GroceryStore> stores = placesClient.nearbyQueryFor(p, (int) bufferRadius);
-            foodDb.insertAll(stores);
-            foodDb.insertSearchedBuffer(p, getBufferRadiusDegrees(p));
+            insertPlacesQuery(p);
         }
         return isInFoodDesertUnchecked(p);
     }
@@ -64,6 +60,56 @@ public class FoodDesertQueryHandler {
         return stores.isEmpty();
     }
 
+
+    /**
+     * Make a call to the Places API for a coordinate and insert the result into the database.
+     * @param p Center of query.
+     * @throws InterruptedException
+     * @throws ApiException
+     * @throws IOException
+     */
+    private void insertPlacesQuery(Coordinate p) throws InterruptedException, ApiException, IOException, SQLException {
+            /*call to places API and update database*/
+            double bufferRadius = getBufferRadiusMeters(p);
+            List<GroceryStore> stores = placesClient.nearbyQueryFor(p, (int) bufferRadius);
+            foodDb.insertAll(stores);
+            foodDb.insertSearchedBuffer(p, getBufferRadiusDegrees(p));
+    }
+
+    /**
+     * Returns all grocery stores in the search frame. Parts of the frame that have been searched are retrieved directly
+     * from the database. For any part of the search frame that is not in the searched buffer, this method makes a call
+     * to the Places API to retrieve information on that location. This is then used to update the database.
+     *
+     * @param searchFrame Area being searched for stores.
+     * @return All stores within search frame.
+     */
+    public List<GroceryStore> getAllGroceryStores(Geometry searchFrame) throws SQLException, ParseException, InterruptedException, ApiException, IOException {
+        /* This implementation is not close to optimal. It is likely that many more requests are made to the places API
+         * than are required. This can be improved by better choice of query coordinates and by increasing the size of
+         * each search buffer. The problem with increasing search buffer size is that a too large buffer will cause the
+         * places API to hit its upper limit (60) and not return all stores in the area. Because of this, buffer radius
+         * should be dynamic. */
+        Geometry unsearchedBuffer = foodDb.selectUnsearchedBuffer(searchFrame);
+
+        /* Repeat until unsearched area is empty.
+         * The semantics of .isEmpty() and .getArea() == 0 seem to be different.
+         * (i.e a line is non-empty but has area == 0.) */
+        while(unsearchedBuffer.getArea() != 0){
+            /*pick a vertex of the unsearched area*/
+            Coordinate vertex = unsearchedBuffer.getCoordinate();
+
+            /*do a query at that point*/
+            insertPlacesQuery(vertex);
+
+            /* subtract searched area from unsearched buffer*/
+            Geometry buffer = geoFactory.createPoint(vertex).buffer(getBufferRadiusDegrees(vertex));
+            unsearchedBuffer = unsearchedBuffer.difference(buffer);
+        }
+
+        return foodDb.selectStore(searchFrame);
+    }
+
     /**
      * Generate a buffer radius around a point that represents the area in which
      * there must be a grocery store for the point to not be in a food
@@ -75,7 +121,7 @@ public class FoodDesertQueryHandler {
      * getBufferRadiusMeters returns this radius in meters so, it should be used
      * to when talking to the Place API or other code that uses Web Mercator
      */
-    private double getBufferRadiusMeters(Coordinate p) {
+    public double getBufferRadiusMeters(Coordinate p) {
         final double METERS_IN_MILE = 1609.34;
         return METERS_IN_MILE;
     }

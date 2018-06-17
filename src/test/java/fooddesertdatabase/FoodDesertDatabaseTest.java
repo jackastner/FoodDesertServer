@@ -228,6 +228,20 @@ public class FoodDesertDatabaseTest {
     }
 
     /**
+     * Test for correct behavior when the searched buffer is empty.
+     */
+    @Test
+    public void testNothingSearched() throws SQLException, ParseException {
+        Geometry unsearchedBuffer = dbInterface.selectUnsearchedBuffer(searchFrame);
+        Geometry searchedBuffer = dbInterface.selectSearchedBuffer(searchFrame);
+
+        assertEquals(0, searchedBuffer.getArea(), 0);
+        assertEquals(searchFrame.getArea(), unsearchedBuffer.getArea(), 0);
+        assertEquals(0.0, unsearchedBuffer.intersection(searchedBuffer).getArea(),0.0);
+        assertTrue(unsearchedBuffer.disjoint(searchedBuffer) || unsearchedBuffer.touches(searchedBuffer));
+    }
+
+    /**
      * Test that a searched buffer and matching unsearched buffer do not intersect (but they can touch).
      */
     @Test

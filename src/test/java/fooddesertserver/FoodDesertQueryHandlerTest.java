@@ -9,6 +9,7 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Properties;
 
 import org.junit.AfterClass;
@@ -16,6 +17,8 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.io.ParseException;
 
 import com.google.maps.errors.ApiException;
@@ -95,4 +98,16 @@ public class FoodDesertQueryHandlerTest {
         assertTrue(queryHandler.isInFoodDesert(nullPoint));
     }
 
+    /**
+     * Simple test for getAllGroceryStores. This only checks that at least 1 stores is returned.
+     */
+    @Test
+    public void testGetAllGroceryStores() throws InterruptedException, SQLException, ApiException, ParseException, IOException {
+        GeometryFactory geometryFactory = new GeometryFactory();
+        Geometry searchFrame = geometryFactory.createPoint(collegePark).buffer(10.0*1609.0/111111.0);
+
+        List<GroceryStore> allStores = queryHandler.getAllGroceryStores(searchFrame);
+
+        assertFalse(allStores.isEmpty());
+    }
 }
