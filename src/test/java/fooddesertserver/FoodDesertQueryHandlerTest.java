@@ -12,6 +12,8 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Properties;
 
+import grocerystoresource.GroceryStoreSource;
+import grocerystoresource.GroceryStoreSourceTestImpl;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -24,13 +26,12 @@ import org.locationtech.jts.io.ParseException;
 import com.google.maps.errors.ApiException;
 
 import fooddesertdatabase.FoodDesertDatabase;
-import googleplacesclient.GooglePlacesClient;
 
 public class FoodDesertQueryHandlerTest {
 
     private static FoodDesertDatabase dbInterface;
-    private static String googleApiKey;
 
+    private GroceryStoreSourceTestImpl storeSource;
     private FoodDesertQueryHandler queryHandler;
     private Coordinate collegePark;
     private Coordinate nullPoint;
@@ -47,15 +48,6 @@ public class FoodDesertQueryHandlerTest {
         dbInterface = FoodDesertDatabase.createDatabase(testDBName);
     }
 
-    @BeforeClass
-    public static void getApiKey() throws IOException {
-        Properties props = new Properties();
-        try (FileInputStream in = new FileInputStream("google_api_key")) {
-            props.load(in);
-        }
-        googleApiKey = props.getProperty("google_api_key");
-    }
-
     @AfterClass
     public static void closeDB() throws SQLException {
         dbInterface.close();
@@ -65,8 +57,8 @@ public class FoodDesertQueryHandlerTest {
     public void setupPlaceClient() throws SQLException {
         dbInterface.truncate();
 
-        GooglePlacesClient placeClient = new GooglePlacesClient(googleApiKey);
-        queryHandler = new FoodDesertQueryHandler(dbInterface, placeClient);
+        storeSource = new GroceryStoreSourceTestImpl();
+        queryHandler = new FoodDesertQueryHandler(dbInterface, storeSource);
 
         /*construct points as (lng,lat)*/
         collegePark = new Coordinate(-76.927, 38.996);
@@ -108,6 +100,7 @@ public class FoodDesertQueryHandlerTest {
 
         List<GroceryStore> allStores = queryHandler.getAllGroceryStores(searchFrame);
 
-        assertFalse(allStores.isEmpty());
+        /* check that the all stores call made at least 1 call. */
+        assertTrue(storeSource.getNumQueries() > 0);
     }
 }

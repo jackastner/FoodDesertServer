@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
 
+import grocerystoresource.GroceryStoreSource;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -13,7 +14,6 @@ import org.locationtech.jts.io.ParseException;
 import com.google.maps.errors.ApiException;
 
 import fooddesertdatabase.FoodDesertDatabase;
-import googleplacesclient.GooglePlacesClient;
 
 /**
  * @author john
@@ -26,10 +26,10 @@ import googleplacesclient.GooglePlacesClient;
 public class FoodDesertQueryHandler {
 
     private final FoodDesertDatabase foodDb;
-    private final GooglePlacesClient placesClient;
+    private final GroceryStoreSource placesClient;
     private final GeometryFactory geoFactory;
 
-    public FoodDesertQueryHandler(FoodDesertDatabase foodDb, GooglePlacesClient placesClient) {
+    public FoodDesertQueryHandler(FoodDesertDatabase foodDb, GroceryStoreSource placesClient) {
         this.foodDb = foodDb;
         this.placesClient = placesClient;
         this.geoFactory = new GeometryFactory();

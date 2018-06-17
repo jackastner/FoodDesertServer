@@ -1,4 +1,4 @@
-package googleplacesclient;
+package grocerystoresource;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -24,12 +24,9 @@ import fooddesertserver.GroceryStore;
  *        This class handles communication with the Google Places API mostly through
  *        calls to the com.google.maps.PlaceApi class which does the real work.
  *
- *        This class should be thread safe, but that is based on the assumption that
- *        org.locationtech.jts.geom.GeometryFactory is thread safe. I could not find
- *        documentation of this fact anywhere but, after reading the source code, I think it is thread safe.
- *        (https://github.com/locationtech/jts/blob/master/modules/core/src/main/java/org/locationtech/jts/geom/GeometryFactory.java)
+ *        This class should be thread safe.
  */
-public class GooglePlacesClient {
+public class GooglePlacesClient implements GroceryStoreSource {
 
     private final GeoApiContext context;
 
@@ -48,6 +45,7 @@ public class GooglePlacesClient {
      * @param radius Radius in meters around the query point to search for grocery stores.
      * @return A list of up to 60 grocery stores found in that area.
      */
+    @Override
     public List<GroceryStore> nearbyQueryFor(Coordinate location, int radius)
             throws ApiException, InterruptedException, IOException {
         // initialize to size 60 because the places API returns max 60 results

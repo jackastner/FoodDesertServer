@@ -14,7 +14,9 @@ import java.util.Properties;
 import org.locationtech.jts.geom.Coordinate;
 
 import fooddesertdatabase.FoodDesertDatabase;
-import googleplacesclient.GooglePlacesClient;
+
+import grocerystoresource.GroceryStoreSource;
+import grocerystoresource.GooglePlacesClient;
 
 public class FoodDesertServer {
 
@@ -71,7 +73,7 @@ public class FoodDesertServer {
             database = FoodDesertDatabase.createDatabase(dbFile);
         }
 
-        GooglePlacesClient client = new GooglePlacesClient(googleApiKey);
+        GroceryStoreSource client = new GooglePlacesClient(googleApiKey);
         FoodDesertQueryHandler queryHandler = new FoodDesertQueryHandler(database, client);
 
         setupRoutes(queryHandler);

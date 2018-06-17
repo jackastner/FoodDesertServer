@@ -1,4 +1,4 @@
-package googleplacesclient;
+package grocerystoresource;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -22,7 +22,7 @@ public class GooglePlacesClientTest {
 
     private static String googleApiKey;
 
-    private GooglePlacesClient placeClient;
+    private GroceryStoreSource placeClient;
     private Coordinate collegePark;
     private Coordinate nullPoint;
 
