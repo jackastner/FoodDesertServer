@@ -5,10 +5,7 @@ import java.sql.SQLException;
 import java.util.List;
 
 import grocerystoresource.GroceryStoreSource;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.GeometryFactory;
-import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.geom.*;
 import org.locationtech.jts.io.ParseException;
 
 import com.google.maps.errors.ApiException;
@@ -85,27 +82,38 @@ public class FoodDesertQueryHandler {
      * @return All stores within search frame.
      */
     public List<GroceryStore> getAllGroceryStores(Geometry searchFrame) throws SQLException, ParseException, InterruptedException, ApiException, IOException {
-        /* This implementation is not close to optimal. It is likely that many more requests are made to the places API
-         * than are required. This can be improved by better choice of query coordinates and by increasing the size of
-         * each search buffer. The problem with increasing search buffer size is that a too large buffer will cause the
-         * places API to hit its upper limit (60) and not return all stores in the area. Because of this, buffer radius
-         * should be dynamic. */
+        /* This implementation should now be optimal for a fixed query radius because it uses a hexagonal tiling of
+         * circles. This produces minimal overlap between the query areas. Further improvement could come from dynamically
+         * increasing the size of query circles.
+         *
+         * The tiling is generated starting at (minx,miny) of the unsearched bounding rectangle. The center of a hexagon
+         * is placed at this corner. Take a line through this point with dx=radius * 3/2 and dy=radius * sqrt(3)/2. The
+         * center of a hexagon is placed for all integers i such that (i*dx, i*dy) is inside the bounding rectangle.
+         * Finally, for each point placed on the line, place points on a vertical line through that point such that the
+         * points are within the bounding rectangle and adjacent points are separated by radius*sqrt(3) units */
+
         Geometry unsearchedBuffer = foodDb.selectUnsearchedBuffer(searchFrame);
+        double radius = getBufferRadiusDegrees(unsearchedBuffer.getCoordinate());
+        Envelope boundingRect = unsearchedBuffer.getEnvelopeInternal();
 
-        /* Repeat until unsearched area is empty.
-         * The semantics of .isEmpty() and .getArea() == 0 seem to be different.
-         * (i.e a line is non-empty but has area == 0.) */
-        while(unsearchedBuffer.getArea() != 0){
-            /*pick a vertex of the unsearched area*/
-            Coordinate vertex = unsearchedBuffer.getCoordinate();
-
-            /*do a query at that point*/
-            insertPlacesQuery(vertex);
-
-            /* subtract searched area from unsearched buffer*/
-            Geometry buffer = geoFactory.createPoint(vertex).buffer(getBufferRadiusDegrees(vertex));
-            unsearchedBuffer = unsearchedBuffer.difference(buffer);
-        }
+        int i = 0;
+        double x,y;
+        do{
+            x = boundingRect.getMinX() + radius * i * 1.5;
+            y = boundingRect.getMinY() + radius * Math.sqrt(3) * i / 2.0;
+            double yPrime;
+            int j = -i/2;
+            do {
+                yPrime = y + (radius * Math.sqrt(3) * j);
+                Point queryPoint = geoFactory.createPoint(new Coordinate(x,yPrime));
+                Geometry buffer = queryPoint.buffer(getBufferRadiusDegrees(queryPoint.getCoordinate()));
+                if(buffer.getEnvelope().intersects(unsearchedBuffer)){
+                    insertPlacesQuery(queryPoint.getCoordinate());
+                }
+                j++;
+            } while (yPrime <= boundingRect.getMaxY());
+            i++;
+        } while(boundingRect.contains(x,y));
 
         return foodDb.selectStore(searchFrame);
     }
