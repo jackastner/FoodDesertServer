@@ -276,12 +276,22 @@ public class FoodDesertDatabase implements AutoCloseable {
      * @throws SQLException
      */
     public void insertSearchedBuffer(Coordinate searched, double radius) throws SQLException {
+        Point coordPoint = geoFactory.createPoint(searched);
+        Geometry buffer = coordPoint.buffer(radius);
+        insertSearchedBuffer(buffer);
+    }
+
+    /**
+     * Mark an area as searched for grocery stores.
+     *
+     * @param buffer The are that has been searched for stores.
+     * @throws SQLException
+     */
+    public void insertSearchedBuffer(Geometry buffer) throws SQLException {
         String sql =
             "INSERT INTO " + SEARCHED_TABLE + " ( " + SEARCHED_BUFFER_COLUMN + ") " +
             "VALUES (GeomFromText(? , " + EPSG + "));";
 
-        Point coordPoint = geoFactory.createPoint(searched);
-        Geometry buffer = coordPoint.buffer(radius);
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             stmt.setString(1, buffer.toText());
             stmt.executeUpdate();
