@@ -22,4 +22,9 @@ public interface GroceryStoreSource {
      */
     List<GroceryStore> nearbyQueryFor(Coordinate location, int radius)
             throws ApiException, InterruptedException, IOException;
+
+    /**
+     * @return The Coordinate reference system used to encode stores returned by this source.
+     */
+    String getEpsg();
 }

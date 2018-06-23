@@ -12,9 +12,11 @@ import java.util.List;
  */
 public class GroceryStoreSourceTestImpl implements GroceryStoreSource {
     private int numQueries;
+    private boolean shouldReturnStore;
 
     public GroceryStoreSourceTestImpl(){
         numQueries = 0;
+        shouldReturnStore = false;
     }
 
     /**
@@ -25,7 +27,18 @@ public class GroceryStoreSourceTestImpl implements GroceryStoreSource {
     @Override
     public List<GroceryStore> nearbyQueryFor(Coordinate location, int radius) {
         numQueries++;
-        return Collections.emptyList();
+        if(shouldReturnStore){
+            shouldReturnStore = false;
+            System.out.println("returning point");
+            return Collections.singletonList(new GroceryStore("test", location));
+        } else {
+            return Collections.emptyList();
+        }
+    }
+
+    @Override
+    public String getEpsg() {
+        return "4326";
     }
 
     /**
@@ -34,5 +47,12 @@ public class GroceryStoreSourceTestImpl implements GroceryStoreSource {
      */
     public int getNumQueries(){
         return numQueries;
+    }
+
+    /**
+     * Make the next query return a store.
+     */
+    public void returnStoreNext(){
+        shouldReturnStore = true;
     }
 }

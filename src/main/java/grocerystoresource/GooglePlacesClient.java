@@ -28,6 +28,8 @@ import fooddesertserver.GroceryStore;
  */
 public class GooglePlacesClient implements GroceryStoreSource {
 
+    private static final String PLACES_EPSG = "4326";
+
     private final GeoApiContext context;
 
     /* Since this class talks to the Google Places API, an API key is needed to
@@ -58,6 +60,11 @@ public class GooglePlacesClient implements GroceryStoreSource {
         fillResultsList(response, results);
 
         return results;
+    }
+
+    @Override
+    public String getEpsg() {
+        return PLACES_EPSG;
     }
 
     /* This function gathers the results included in a Places response into a List

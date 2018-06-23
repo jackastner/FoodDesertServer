@@ -2,6 +2,8 @@ package fooddesertserver;
 
 import org.locationtech.jts.geom.Coordinate;
 
+import java.util.function.Function;
+
 /**
  * @author john
  *
@@ -47,6 +49,15 @@ public class GroceryStore {
      */
     public GroceryStore(String name, Coordinate location) {
         this(-1, name, location);
+    }
+
+    /**
+     * Construct a GroceryStore identical to the first argument but with the transformation applied to its location.
+     * @param store Store to be copied.
+     * @param transformation Transformation to be applied to location.
+     */
+    private GroceryStore(GroceryStore store, Function<Coordinate, Coordinate> transformation){
+        this(store.id, store.name, transformation.apply(store.location));
     }
 
     /**
@@ -109,6 +120,14 @@ public class GroceryStore {
         }
 
         return new GroceryStore(id, this.name, this.location);
+    }
+
+    /**
+     * Create a copy of this grocery store but with the provided transformation applied to
+     * the location.
+     */
+    public GroceryStore transform(Function<Coordinate, Coordinate> transformation){
+        return new GroceryStore(this, transformation);
     }
 
     @Override

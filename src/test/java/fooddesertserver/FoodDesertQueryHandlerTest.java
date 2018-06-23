@@ -2,7 +2,6 @@ package fooddesertserver;
 
 import static org.junit.Assert.*;
 
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -10,15 +9,14 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.util.List;
-import java.util.Properties;
 
-import grocerystoresource.GroceryStoreSource;
 import grocerystoresource.GroceryStoreSourceTestImpl;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.io.ParseException;
@@ -70,13 +68,7 @@ public class FoodDesertQueryHandlerTest {
      */
     @Test
     public void testNotInFoodDesert() throws SQLException, ParseException, ApiException, InterruptedException, IOException {
-        /* Ask about college park. This could be true or false depending on what the place API returns
-         * but, it will mark the area around college park as searched. */
-        queryHandler.isInFoodDesert(collegePark);
-
-        /* Add a fake store in college park so that the next query must return true */
-        dbInterface.insertStore(new GroceryStore("test", collegePark));
-
+        storeSource.returnStoreNext();
         assertFalse(queryHandler.isInFoodDesert(collegePark));
     }
 
@@ -96,7 +88,9 @@ public class FoodDesertQueryHandlerTest {
     @Test
     public void testGetAllGroceryStores() throws InterruptedException, SQLException, ApiException, ParseException, IOException {
         GeometryFactory geometryFactory = new GeometryFactory();
-        Geometry searchFrame = geometryFactory.createPoint(collegePark).buffer(10.0*1609.0/111111.0);
+        Envelope searchEnv = new Envelope(-76.991844, -76.795807,38.916682, 39.020251);
+        Geometry searchFrame = geometryFactory.toGeometry(searchEnv);
+        //forces one store into the results
 
         List<GroceryStore> allStores = queryHandler.getAllGroceryStores(searchFrame);
 

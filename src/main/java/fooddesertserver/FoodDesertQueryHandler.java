@@ -3,13 +3,16 @@ package fooddesertserver;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.stream.Collectors;
 
-import grocerystoresource.GroceryStoreSource;
+import org.osgeo.proj4j.*;
+
 import org.locationtech.jts.geom.*;
 import org.locationtech.jts.io.ParseException;
 
 import com.google.maps.errors.ApiException;
 
+import grocerystoresource.GroceryStoreSource;
 import fooddesertdatabase.FoodDesertDatabase;
 
 /**
@@ -22,15 +25,35 @@ import fooddesertdatabase.FoodDesertDatabase;
  */
 public class FoodDesertQueryHandler {
 
+    /* Input and output coordinates for Proj4j can be reused but, each thread requires its own copy. */
+    private static final ThreadLocal<ProjCoordinate> projInput  = ThreadLocal.withInitial(ProjCoordinate::new),
+                                                     projOutput = ThreadLocal.withInitial(ProjCoordinate::new);
+
     private final FoodDesertDatabase foodDb;
     private final GroceryStoreSource placesClient;
     private final GeometryFactory geoFactory;
+
+    private final CoordinateTransform dbToSrc, srcToDb;
+
 
     public FoodDesertQueryHandler(FoodDesertDatabase foodDb, GroceryStoreSource placesClient) {
         this.foodDb = foodDb;
         this.placesClient = placesClient;
         this.geoFactory = new GeometryFactory();
+
+        /* Construct coordinate system transformations between the store source and
+         * database. */
+
+        CoordinateTransformFactory ctFactory = new CoordinateTransformFactory();
+        CRSFactory csFactory = new CRSFactory();
+
+        CoordinateReferenceSystem crsDb = csFactory.createFromName("EPSG:"+foodDb.getEpsg());
+        CoordinateReferenceSystem crsSrc = csFactory.createFromName("EPSG:"+placesClient.getEpsg());
+
+        dbToSrc = ctFactory.createTransform(crsDb, crsSrc);
+        srcToDb = ctFactory.createTransform(crsSrc, crsDb);
     }
+
 
     /**
      * Test a point to see if it is in a food desert. This function queries both
@@ -38,7 +61,8 @@ public class FoodDesertQueryHandler {
      * API is added to the database.
      */
     public boolean isInFoodDesert(Coordinate p) throws SQLException, ParseException, ApiException, InterruptedException, IOException {
-        if(!foodDb.inSearchedBuffer(p)) {
+        Coordinate dbCoord = projSrcToDb(p);
+        if(!foodDb.inSearchedBuffer(dbCoord)) {
             insertPlacesQuery(p);
         }
         return isInFoodDesertUnchecked(p);
@@ -50,9 +74,10 @@ public class FoodDesertQueryHandler {
      * not check the search buffer or make a call to the Places API.
      */
     private boolean isInFoodDesertUnchecked(Coordinate p) throws SQLException, ParseException {
-        double bufferRadius = getBufferRadiusDegrees(p);
-        Point coordPoint = geoFactory.createPoint(p);
+        Point coordPoint = geoFactory.createPoint(projSrcToDb(p));
+        double bufferRadius = getBufferRadiusMeters(p);
         Geometry buffer = coordPoint.buffer(bufferRadius);
+
         List<GroceryStore> stores = foodDb.selectStore(buffer);
         return stores.isEmpty();
     }
@@ -66,11 +91,19 @@ public class FoodDesertQueryHandler {
      * @throws IOException
      */
     private void insertPlacesQuery(Coordinate p) throws InterruptedException, ApiException, IOException, SQLException {
-            /*call to places API and update database*/
-            double bufferRadius = getBufferRadiusMeters(p);
-            List<GroceryStore> stores = placesClient.nearbyQueryFor(p, (int) bufferRadius);
-            foodDb.insertAll(stores);
-            foodDb.insertSearchedBuffer(p, getBufferRadiusDegrees(p));
+        double bufferRadius = getBufferRadiusMeters(p);
+
+        /* collect grocery stores from source and project them into the database coordinates
+         * system before inserting into the database. */
+        List<GroceryStore> stores = placesClient.nearbyQueryFor(p, (int) bufferRadius)
+                                                .stream()
+                                                .map(s -> s.transform(this::projSrcToDb))
+                                                .collect(Collectors.toList());
+        foodDb.insertAll(stores);
+
+        /* insert query point and query size into database (after projection).*/
+        Coordinate dbCoord = projSrcToDb(p);
+        foodDb.insertSearchedBuffer(dbCoord, bufferRadius);
     }
 
     /**
@@ -92,8 +125,10 @@ public class FoodDesertQueryHandler {
          * Finally, for each point placed on the line, place points on a vertical line through that point such that the
          * points are within the bounding rectangle and adjacent points are separated by radius*sqrt(3) units */
 
-        Geometry unsearchedBuffer = foodDb.selectUnsearchedBuffer(searchFrame);
-        double radius = getBufferRadiusDegrees(unsearchedBuffer.getCoordinate());
+        Geometry projectedSearchFrame = new PointTransformer(this::projSrcToDb).transform(searchFrame);
+        Geometry unsearchedBuffer = foodDb.selectUnsearchedBuffer(projectedSearchFrame);
+
+        double radius = getBufferRadiusMeters(unsearchedBuffer.getCoordinate());
         Envelope boundingRect = unsearchedBuffer.getEnvelopeInternal();
 
         int i = 0;
@@ -101,14 +136,15 @@ public class FoodDesertQueryHandler {
         do{
             x = boundingRect.getMinX() + radius * i * 1.5;
             y = boundingRect.getMinY() + radius * Math.sqrt(3) * i / 2.0;
+
             double yPrime;
             int j = -i/2;
             do {
                 yPrime = y + (radius * Math.sqrt(3) * j);
                 Point queryPoint = geoFactory.createPoint(new Coordinate(x,yPrime));
-                Geometry buffer = queryPoint.buffer(getBufferRadiusDegrees(queryPoint.getCoordinate()));
+                Geometry buffer = queryPoint.buffer(radius);
                 if(buffer.getEnvelope().intersects(unsearchedBuffer)){
-                    insertPlacesQuery(queryPoint.getCoordinate());
+                    insertPlacesQuery(projDbToSrc(queryPoint.getCoordinate()));
                 }
                 j++;
             } while (yPrime <= boundingRect.getMaxY());
@@ -134,21 +170,23 @@ public class FoodDesertQueryHandler {
         return METERS_IN_MILE;
     }
 
-    /**
-     * Generate a buffer radius around a point that represents the area in which
-     * there must be a grocery store for the point to not be in a food
-     * desert.
-     *
-     * The current implementation returns a constant size buffer of 1 mile but,
-     * future implementations should generate it dynamically based on location.
-     *
-     * getBufferRadiusDegrees this radius in decimal degrees so, it should be
-     * used when talking to code such as the SpatiaLite Database that uses WGS84.
-     */
-    private double getBufferRadiusDegrees(Coordinate p) {
-        double radiusMeters = getBufferRadiusMeters(p);
-        /*this is a fairly rough estimate, see: https://gis.stackexchange.com/a/2964/85520*/
-        final double DEGREES_IN_METER = 1.0/111_111.0;
-        return radiusMeters * DEGREES_IN_METER;
+    /* These methods handel marshalling data between jts  coordinates and Proj4j coordinates so that
+     * point projections can be done with minimal boiler plate. */
+
+    private Coordinate projSrcToDb(Coordinate srcCoord){
+        return projJts(srcCoord, srcToDb);
+    }
+
+    private Coordinate projDbToSrc(Coordinate dbCoord){
+        return projJts(dbCoord, dbToSrc);
+    }
+
+    private static Coordinate projJts(Coordinate jtsCoord, CoordinateTransform proj){
+        projInput.get().x = jtsCoord.x;
+        projInput.get().y = jtsCoord.y;
+
+        proj.transform(projInput.get(), projOutput.get());
+
+        return new Coordinate(projOutput.get().x, projOutput.get().y);
     }
 }

@@ -27,6 +27,9 @@ import fooddesertserver.GroceryStore;
  *         with a 'grocery_store' table defined according to the schema in this
  *         class.
  *
+ *         All coordinates inserted into this database should be in WebMercator (EPSG 3857).
+ *         Likewise, all coordinates retreived from this database will be projected in WebMercator.
+ *
  *         This class is Thread safe.
  */
 public class FoodDesertDatabase implements AutoCloseable {
@@ -41,7 +44,7 @@ public class FoodDesertDatabase implements AutoCloseable {
     private static final String SEARCHED_ID_COLUMN = "id";
     private static final String SEARCHED_BUFFER_COLUMN = "buffer";
 
-    private static final String EPGS = "4326";
+    private static final String EPSG = "3857";
 
     /**
      * Construct a common subquery used when working with a SpatiaLite spatial index.
@@ -139,7 +142,7 @@ public class FoodDesertDatabase implements AutoCloseable {
                     + GROCERY_NAME_COLUMN + " TEXT, " + GROCERY_LOCATION_COLUMN + " UNIQUE)");
 
             /*add a geometry column to this table and index it with a spatial index*/
-            stmt.execute("SELECT RecoverGeometryColumn('" + GROCERY_TABLE + "', '" + GROCERY_LOCATION_COLUMN + "', " + EPGS
+            stmt.execute("SELECT RecoverGeometryColumn('" + GROCERY_TABLE + "', '" + GROCERY_LOCATION_COLUMN + "', " + EPSG
                     + ", 'POINT', 2)");
             stmt.execute("SELECT CreateSpatialIndex('" + GROCERY_TABLE + "', '" + GROCERY_LOCATION_COLUMN + "')");
 
@@ -147,7 +150,7 @@ public class FoodDesertDatabase implements AutoCloseable {
             stmt.execute("CREATE TABLE " + SEARCHED_TABLE + "(" + SEARCHED_ID_COLUMN + " INTEGER NOT NULL PRIMARY KEY)");
 
             /*add a geometry column to this table and index it with a spatial index*/
-            stmt.execute("SELECT AddGeometryColumn('" + SEARCHED_TABLE + "', '" + SEARCHED_BUFFER_COLUMN + "', " + EPGS
+            stmt.execute("SELECT AddGeometryColumn('" + SEARCHED_TABLE + "', '" + SEARCHED_BUFFER_COLUMN + "', " + EPSG
                     + ", 'POLYGON', 2)");
             stmt.execute("SELECT CreateSpatialIndex('" + SEARCHED_TABLE + "', '" + SEARCHED_BUFFER_COLUMN + "')");
         }
@@ -180,7 +183,7 @@ public class FoodDesertDatabase implements AutoCloseable {
 
         String sql =
             "INSERT INTO " + GROCERY_TABLE + " ( " + GROCERY_NAME_COLUMN + ", " + GROCERY_LOCATION_COLUMN + ") " +
-            "VALUES ( ? , GeomFromText(? , " + EPGS + "));";
+            "VALUES ( ? , GeomFromText(? , " + EPSG + "));";
 
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             Point coordPoint = geoFactory.createPoint(store.getLocation());
@@ -275,7 +278,7 @@ public class FoodDesertDatabase implements AutoCloseable {
     public void insertSearchedBuffer(Coordinate searched, double radius) throws SQLException {
         String sql =
             "INSERT INTO " + SEARCHED_TABLE + " ( " + SEARCHED_BUFFER_COLUMN + ") " +
-            "VALUES (GeomFromText(? , " + EPGS + "));";
+            "VALUES (GeomFromText(? , " + EPSG + "));";
 
         Point coordPoint = geoFactory.createPoint(searched);
         Geometry buffer = coordPoint.buffer(radius);
@@ -387,6 +390,10 @@ public class FoodDesertDatabase implements AutoCloseable {
     @Override
     public void close() throws SQLException {
         connection.close();
+    }
+
+    public String getEpsg(){
+        return EPSG;
     }
 
 }
