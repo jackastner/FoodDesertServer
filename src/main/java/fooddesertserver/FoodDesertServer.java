@@ -1,6 +1,12 @@
 package fooddesertserver;
 
-import static spark.Spark.*;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import fooddesertdatabase.FoodDesertDatabase;
+import grocerystoresource.GooglePlacesClient;
+import grocerystoresource.GroceryStoreSource;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Envelope;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -9,14 +15,11 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Properties;
 
-import org.locationtech.jts.geom.Coordinate;
-
-import fooddesertdatabase.FoodDesertDatabase;
-
-import grocerystoresource.GroceryStoreSource;
-import grocerystoresource.GooglePlacesClient;
+import static spark.Spark.get;
+import static spark.Spark.staticFiles;
 
 public class FoodDesertServer {
 
@@ -28,14 +31,33 @@ public class FoodDesertServer {
     }
 
     private static void setupRoutes(FoodDesertQueryHandler queryHandler) {
+        GsonBuilder builder = new GsonBuilder();
+        /*custom serialization to rename fields of the Coordinate field*/
+        builder.registerTypeAdapter(GroceryStore.class, new GroceryStore.JsonSerializer());
+        Gson gson = builder.create();
+
         staticFiles.location("/public");
 
         get("/is_in_food_desert", (request, response) -> {
             double lng = Double.parseDouble(request.queryParams("lng"));
             double lat = Double.parseDouble(request.queryParams("lat"));
             Coordinate location = new Coordinate(lng,lat);
+
             boolean isInFoodDesert = queryHandler.isInFoodDesert(location);
-            return String.valueOf(isInFoodDesert);
+
+            return gson.toJson(isInFoodDesert);
+        });
+
+        get("/locate_stores", (request, response) -> {
+            double lng0 = Double.parseDouble(request.queryParams("lng0"));
+            double lng1 = Double.parseDouble(request.queryParams("lng1"));
+            double lat0 = Double.parseDouble(request.queryParams("lat0"));
+            double lat1 = Double.parseDouble(request.queryParams("lat1"));
+            Envelope queryArea = new Envelope(lng0, lng1, lat0, lat1);
+
+            List<GroceryStore> result = queryHandler.getAllGroceryStore(queryArea);
+
+            return  gson.toJson(result);
         });
     }
 

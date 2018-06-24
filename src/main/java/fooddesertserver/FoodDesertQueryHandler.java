@@ -157,7 +157,11 @@ public class FoodDesertQueryHandler {
             i++;
         } while(boundingRect.contains(x,y));
 
-        return foodDb.selectStore(projectedSearchFrame);
+        /*project data back to source projection before returning*/
+        return foodDb.selectStore(projectedSearchFrame)
+                     .stream()
+                     .map(e -> e.transform(this::projDbToSrc))
+                     .collect(Collectors.toList());
     }
 
     /**

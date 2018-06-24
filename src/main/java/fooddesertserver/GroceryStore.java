@@ -1,7 +1,11 @@
 package fooddesertserver;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonSerializationContext;
 import org.locationtech.jts.geom.Coordinate;
 
+import java.lang.reflect.Type;
 import java.util.function.Function;
 
 /**
@@ -133,5 +137,21 @@ public class GroceryStore {
     @Override
     public String toString() {
         return String.format("GroceryStore: {id = %d, name = %s, location = %s}", id, name, location.toString());
+    }
+
+    /**
+     * Implements Json serialization for this class that flattens the Coordinate field and renames the x and y fields
+     * of the Coordinate class to match the use case for the api
+     */
+    public static class JsonSerializer implements com.google.gson.JsonSerializer<GroceryStore> {
+        @Override
+        public JsonElement serialize(GroceryStore src, Type typeOfSrc, JsonSerializationContext context) {
+            JsonObject obj = new JsonObject();
+            obj.add("id", context.serialize(src.id));
+            obj.add("name", context.serialize(src.name));
+            obj.add("lat", context.serialize(src.location.y));
+            obj.add("lng", context.serialize(src.location.x));
+            return obj;
+        }
     }
 }
