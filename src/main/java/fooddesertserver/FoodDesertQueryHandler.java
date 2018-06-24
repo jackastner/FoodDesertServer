@@ -143,7 +143,13 @@ public class FoodDesertQueryHandler {
                 yPrime = y + (radius * Math.sqrt(3) * j);
                 Point queryPoint = geoFactory.createPoint(new Coordinate(x,yPrime));
                 Geometry buffer = queryPoint.buffer(radius);
-                if(buffer.getEnvelope().intersects(unsearchedBuffer)){
+
+                /* Buffer.intersects(unsearchedBuffer) was returning true when I really shouldn't.
+                 * My best guess is that this is caused by floating point rounding errors. The current hack
+                 * to solve this is allowing a very small amount of overlap between search buffers and the
+                 * unsearched buffer.
+                 */
+                if(buffer.intersection(unsearchedBuffer).getArea() > 1e-3){
                     insertPlacesQuery(projDbToSrc(queryPoint.getCoordinate()));
                 }
                 j++;
@@ -151,7 +157,18 @@ public class FoodDesertQueryHandler {
             i++;
         } while(boundingRect.contains(x,y));
 
-        return foodDb.selectStore(searchFrame);
+        return foodDb.selectStore(projectedSearchFrame);
+    }
+
+    /**
+     * A utility method overloading getAllGroceryStores(Geometry) to make call to the method with out a
+     * geometry. This lets the server call to this function without needing to instantiate its own geometry
+     * factory.
+     * @param searchFrame Area being searched.
+     * @return All stores withing the search frame.
+     */
+    public List<GroceryStore> getAllGroceryStore(Envelope searchFrame) throws InterruptedException, SQLException, ApiException, ParseException, IOException {
+        return getAllGroceryStores(geoFactory.toGeometry(searchFrame));
     }
 
     /**
