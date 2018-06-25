@@ -15,12 +15,39 @@
                  height: 100%;
                  margin: 0;
                  padding: 0;
-              }
+             }
+
+             #controls {
+                 position: fixed;
+                 top: 7%;
+                 left: 0;
+                 background-color: rgba(0,0,0,0.5);
+                 color: white;
+                 border: solid black;
+             }
+
+             #queryButton {
+                 position: fixed;
+                 bottom: 3%;
+                 left: 50%;
+                 transform: translateX(-50%);
+             }
         </style>
     </head>
 
     <body>
         <div id="map"></div>
+        <div id="controls">
+            <input type="radio" name="mapMode" id="query_coordinate" value="query_coordinate">
+            <label for="query_coordinate">Query Coordinate</label>
+
+            <br>
+
+            <input type="radio" name="mapMode" id="query_envelope" value="query_point" checked="checked">
+            <label for="query_envelope">Query Envelope</label>
+        </div>
+
+        <button id="queryButton">Submit Envelope Query</button>
         <script src="food_desert_map.js"></script>
         <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCEB7l7oyELTj1XkVGR5JcJylSzNQNS9Ns&libraries=places,visualization,geometry&callback=initMap" async defer></script>
     </body>
