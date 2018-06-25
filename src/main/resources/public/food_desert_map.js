@@ -43,30 +43,57 @@ function initMap() {
     /* Create map element for this page */
     map = new google.maps.Map(document.getElementById('map'));
 
-    /* Move map view window to user location if the user agrees */
-    if(navigator.geolocation){
-        navigator.geolocation.getCurrentPosition( function (latlng) {
-            map.setCenter({lat: latlng.coords.latitude, lng: latlng.coords.longitude});
-            queryRectangle = new google.maps.Rectangle({
-                fillOpacity: 0.33,
-                fillColor: '#FF0000',
-                map:map,
-                editable: true,
-                draggable: true,
-                bounds: {
-                    north: latlng.coords.latitude + 0.1,
-                    south: latlng.coords.latitude - 0.1,
-                    east: latlng.coords.longitude + 0.1,
-                    west: latlng.coords.longitude - 0.1
-                }
-            })
-            map.setZoom(10);
-        });
+    /* Move map view window to user location if the user agrees.
+     * Also only attempt to get location if connection is over https. */
+    try {
+        if((location.protocol === 'https:') && navigator.geolocation){
+             navigator.geolocation.getCurrentPosition( function (latlng) {
+                 map.setCenter({lat: latlng.coords.latitude, lng: latlng.coords.longitude});
+                 queryRectangle = new google.maps.Rectangle({
+                     fillOpacity: 0.33,
+                     fillColor: '#FF0000',
+                     map:map,
+                     editable: true,
+                     draggable: true,
+                     bounds: {
+                         north: latlng.coords.latitude + 0.1,
+                         south: latlng.coords.latitude - 0.1,
+                         east: latlng.coords.longitude + 0.1,
+                         west: latlng.coords.longitude - 0.1
+                     }
+                 })
+                 map.setZoom(10);
+            });
+        } else {
+            setDefaultMap();
+        }
+    } catch (e) {
+        setDefaultMap();
     }
-;
+
     /* When the user clicks on the map a request is sent to the server.
      * The response is used to place a new marker on the map. */
     map.addListener('click', e => handleMapClick(e.latLng));
+}
+
+function setDefaultMap(){
+    map.setCenter({lat: 0, lng:0});
+    map.setZoom(1);
+    var center = map.getCenter();
+
+    queryRectangle = new google.maps.Rectangle({
+        fillOpacity: 0.33,
+        fillColor: '#FF0000',
+        map:map,
+        editable: true,
+        draggable: true,
+        bounds: {
+            north: 10,
+            south: -10,
+            east: 10,
+            west: -10
+        }
+    });
 }
 
 /*Handles a map click depending on the map mode selected*/
