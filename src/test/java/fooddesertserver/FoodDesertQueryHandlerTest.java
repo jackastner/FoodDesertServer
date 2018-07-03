@@ -97,4 +97,58 @@ public class FoodDesertQueryHandlerTest {
         /* check that the all stores call made at least 1 call. */
         assertTrue(storeSource.getNumQueries() > 0);
     }
+
+    /**
+     * Test that a second request entirely contained within the first does not generate extra queries.
+     */
+    @Test
+    public void testNoExtraQueries() throws InterruptedException, SQLException, ApiException, ParseException, IOException {
+        GeometryFactory geometryFactory = new GeometryFactory();
+
+        Envelope intSearchEnv = new Envelope(-76.951844, -76.855807,38.946682, 39.000251);
+        Geometry intSearchFrame = geometryFactory.toGeometry(intSearchEnv);
+
+        Envelope extSearchEnv = new Envelope(-76.991844, -76.795807,38.916682, 39.020251);
+        Geometry extSearchFrame = geometryFactory.toGeometry(extSearchEnv);
+
+        queryHandler.getAllGroceryStores(extSearchFrame);
+
+        storeSource.resetNumQueries();
+
+        queryHandler.getAllGroceryStores(intSearchFrame);
+
+        assertEquals(0, storeSource.getNumQueries());
+    }
+
+    /**
+     * Test that a request intersecting an existing request performs fewer queries than
+     * it would otherwise.
+     */
+    @Test
+    public void testNoDoubleQueries() throws InterruptedException, SQLException, ApiException, ParseException, IOException {
+        GeometryFactory geometryFactory = new GeometryFactory();
+
+        Envelope intSearchEnv = new Envelope(-76.951844, -76.855807,38.946682, 39.000251);
+        Geometry intSearchFrame = geometryFactory.toGeometry(intSearchEnv);
+
+        Envelope extSearchEnv = new Envelope(-76.991844, -76.795807,38.916682, 39.020251);
+        Geometry extSearchFrame = geometryFactory.toGeometry(extSearchEnv);
+
+
+        /*get baseline for ext request*/
+        queryHandler.getAllGroceryStores(extSearchFrame);
+        int extQueryCount = storeSource.getNumQueries();
+
+        /*reset database*/
+        dbInterface.truncate();
+
+        queryHandler.getAllGroceryStores(intSearchFrame);
+
+        storeSource.resetNumQueries();
+
+        queryHandler.getAllGroceryStores(extSearchFrame);
+        int nestedQueryCount = storeSource.getNumQueries();
+
+        assertTrue(extQueryCount > nestedQueryCount);
+    }
 }

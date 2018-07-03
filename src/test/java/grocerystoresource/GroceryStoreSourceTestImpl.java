@@ -29,7 +29,6 @@ public class GroceryStoreSourceTestImpl implements GroceryStoreSource {
         numQueries++;
         if(shouldReturnStore){
             shouldReturnStore = false;
-            System.out.println("returning point");
             return Collections.singletonList(new GroceryStore("test", location));
         } else {
             return Collections.emptyList();
@@ -47,6 +46,13 @@ public class GroceryStoreSourceTestImpl implements GroceryStoreSource {
      */
     public int getNumQueries(){
         return numQueries;
+    }
+
+    /**
+     * Set the number of queries count to 0. Also useful for tests.
+     */
+    public void resetNumQueries(){
+        numQueries = 0;
     }
 
     /**

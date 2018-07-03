@@ -1,5 +1,6 @@
 package fooddesertdatabase;
 
+import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -269,19 +270,6 @@ public class FoodDesertDatabase implements AutoCloseable {
     }
 
     /**
-     * Mark an area around a point as searched for grocery stores.
-     *
-     * @param searched The center of the searched area.
-     * @param radius Distance around the center that was searched.
-     * @throws SQLException
-     */
-    public void insertSearchedBuffer(Coordinate searched, double radius) throws SQLException {
-        Point coordPoint = geoFactory.createPoint(searched);
-        Geometry buffer = coordPoint.buffer(radius);
-        insertSearchedBuffer(buffer);
-    }
-
-    /**
      * Mark an area as searched for grocery stores.
      *
      * @param buffer The are that has been searched for stores.
@@ -350,10 +338,21 @@ public class FoodDesertDatabase implements AutoCloseable {
      * @return Geometry containing the difference between the search frame and the searched area.
      */
     public Geometry selectUnsearchedBuffer(Geometry searchFrame) throws SQLException, ParseException {
-        /* Unsearched is defined in terms of searched because I was have issues with empty unions in Spatialite
-         * If this turns out to be to slow, perhaps implement it directly in SQL.*/
-        Geometry searchedBuffer = selectSearchedBuffer(searchFrame);
-        return searchFrame.difference(searchedBuffer);
+        /* The case expression is needed because SpatiaLite returns null instead of an empty geometry. This is inconvenient
+         * because SpatiaLite functions do not treat null inputs as empty geometries. */
+        String sql =
+            "SELECT CASE " +
+                "WHEN ST_Union(" + SEARCHED_BUFFER_COLUMN + ") IS NULL " +
+                    "THEN ? " +
+                "ELSE " +
+                    "AsText(ST_Difference(GeomFromText(?), ST_Union(" + SEARCHED_BUFFER_COLUMN + "))) " +
+            "END " +
+            "FROM " + SEARCHED_TABLE + " " +
+            "WHERE " + SEARCHED_ID_COLUMN + " IN (" +
+                spatialIndexSubQuery(SEARCHED_TABLE) + ");";
+
+        String searchFrameWKT = searchFrame.toText();
+        return querySingleGeometryResult(sql, searchFrameWKT, searchFrameWKT, searchFrameWKT);
     }
 
     /**
