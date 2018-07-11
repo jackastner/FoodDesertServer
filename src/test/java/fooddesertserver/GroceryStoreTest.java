@@ -102,4 +102,20 @@ public class GroceryStoreTest {
         assertEquals(store0.hashCode(), store1.hashCode());
     }
 
+    /**
+     * Test that equal store serialize to equal string and that non equal stores serialize to non-equal strings.
+     */
+    @Test
+    public void jsonSerialize(){
+        GsonBuilder builder = new GsonBuilder();
+        builder.registerTypeAdapter(GroceryStore.class, new GroceryStore.JsonSerializer());
+        Gson gson = builder.create();
+
+        GroceryStore store0 = new GroceryStore(1, "test", testPoint);
+        GroceryStore store1 = new GroceryStore(1, "test", testPoint);
+        GroceryStore store2 = new GroceryStore("test", testPoint);
+
+        assertEquals(gson.toJson(store0), gson.toJson(store1));
+        assertNotEquals(gson.toJson(store0), gson.toJson(store2));
+    }
 }
