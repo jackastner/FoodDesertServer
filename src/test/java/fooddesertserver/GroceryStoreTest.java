@@ -2,6 +2,8 @@ package fooddesertserver;
 
 import static org.junit.Assert.*;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import org.junit.Before;
 import org.junit.Test;
 import org.locationtech.jts.geom.Coordinate;
@@ -76,6 +78,28 @@ public class GroceryStoreTest {
         GroceryStore withId = new GroceryStore(1, "test", testPoint);
 
         withId.setId(2);
+    }
+
+    @Test
+    public void testEquals(){
+        GroceryStore store0 = new GroceryStore(1, "test", testPoint);
+        GroceryStore store1 = new GroceryStore(1, "test", testPoint);
+        GroceryStore store2 = new GroceryStore("test", testPoint);
+
+        assertEquals(store0, store0);
+        assertEquals(store0, store1);
+
+        assertNotEquals(store0, store2);
+        assertNotEquals(store0, null);
+        assertNotEquals(store0, new Object());
+    }
+
+    @Test
+    public void testHashCode(){
+        GroceryStore store0 = new GroceryStore(1, "test", testPoint);
+        GroceryStore store1 = new GroceryStore(1, "test", testPoint);
+
+        assertEquals(store0.hashCode(), store1.hashCode());
     }
 
 }
