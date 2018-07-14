@@ -1,27 +1,20 @@
 package fooddesertserver;
 
+import com.google.maps.errors.ApiException;
+import fooddesertdatabase.FoodDesertDatabase;
+import grocerystoresource.GroceryStoreSource;
+import org.locationtech.jts.geom.*;
+import org.locationtech.jts.io.ParseException;
+import org.locationtech.jts.triangulate.VoronoiDiagramBuilder;
+import org.osgeo.proj4j.*;
+
 import java.io.IOException;
-import java.security.Policy;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
-
-import org.locationtech.jts.geom.*;
-
-import org.locationtech.jts.io.ParseException;
-
-import com.google.maps.errors.ApiException;
-
-import grocerystoresource.GroceryStoreSource;
-import fooddesertdatabase.FoodDesertDatabase;
-import org.osgeo.proj4j.CRSFactory;
-import org.osgeo.proj4j.CoordinateReferenceSystem;
-import org.osgeo.proj4j.CoordinateTransform;
-import org.osgeo.proj4j.CoordinateTransformFactory;
-import org.osgeo.proj4j.ProjCoordinate;
 
 /**
  * @author john
@@ -215,6 +208,24 @@ public class FoodDesertQueryHandler {
      */
     public List<GroceryStore> getAllGroceryStore(Envelope searchFrame) throws InterruptedException, SQLException, ApiException, ParseException, IOException {
         return getAllGroceryStores(geoFactory.toGeometry(searchFrame));
+    }
+
+
+    public VoronoiDiagram getVoronoiDiagram(Geometry searchFrame) throws InterruptedException, SQLException, ApiException, ParseException, IOException {
+        List<Coordinate>  diagramSites = this.getAllGroceryStores(searchFrame)
+                                             .stream()
+                                             .map(GroceryStore::getLocation)
+                                             .collect(Collectors.toList());
+
+        VoronoiDiagramBuilder diagramBuilder = new VoronoiDiagramBuilder();
+        diagramBuilder.setSites(diagramSites);
+        diagramBuilder.setClipEnvelope(searchFrame.getEnvelopeInternal());
+
+        return new VoronoiDiagram(diagramBuilder, geoFactory);
+    }
+
+    public VoronoiDiagram getVoronoiDiagram(Envelope searchFrame) throws InterruptedException, SQLException, ApiException, ParseException, IOException {
+        return getVoronoiDiagram(geoFactory.toGeometry(searchFrame));
     }
 
     /**

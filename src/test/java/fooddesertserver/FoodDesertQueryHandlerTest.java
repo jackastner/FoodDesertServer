@@ -151,4 +151,23 @@ public class FoodDesertQueryHandlerTest {
 
         assertTrue(extQueryCount > nestedQueryCount);
     }
+
+    /**
+     * For the moment, this just tests that getVoronoiDiagram doesn't crash
+     */
+    @Test
+    public void testVoronoiDiagram() throws SQLException, InterruptedException, ApiException, ParseException, IOException {
+        Envelope searchFrame = new Envelope(-1,1,-1,1);
+
+        storeSource.returnStoreNext();
+        queryHandler.isInFoodDesert(new Coordinate(-1, -1));
+
+        storeSource.returnStoreNext();
+        queryHandler.isInFoodDesert(new Coordinate(1, 1));
+
+        storeSource.returnStoreNext();
+        queryHandler.isInFoodDesert(new Coordinate(0, 0));
+
+        queryHandler.getVoronoiDiagram(searchFrame);
+    }
 }
