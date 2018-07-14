@@ -11,10 +11,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.GeometryFactory;
-import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.geom.*;
 import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKTReader;
 import org.sqlite.SQLiteConfig;
@@ -152,7 +149,7 @@ public class FoodDesertDatabase implements AutoCloseable {
 
             /*add a geometry column to this table and index it with a spatial index*/
             stmt.execute("SELECT AddGeometryColumn('" + SEARCHED_TABLE + "', '" + SEARCHED_BUFFER_COLUMN + "', " + EPSG
-                    + ", 'POLYGON', 2)");
+                    + ", 'MULTIPOLYGON', 2)");
             stmt.execute("SELECT CreateSpatialIndex('" + SEARCHED_TABLE + "', '" + SEARCHED_BUFFER_COLUMN + "')");
         }
 
@@ -275,7 +272,7 @@ public class FoodDesertDatabase implements AutoCloseable {
      * @param buffer The are that has been searched for stores.
      * @throws SQLException
      */
-    public void insertSearchedBuffer(Geometry buffer) throws SQLException {
+    public void insertSearchedBuffer(MultiPolygon buffer) throws SQLException {
         String sql =
             "INSERT INTO " + SEARCHED_TABLE + " ( " + SEARCHED_BUFFER_COLUMN + ") " +
             "VALUES (GeomFromText(? , " + EPSG + "));";
@@ -283,6 +280,19 @@ public class FoodDesertDatabase implements AutoCloseable {
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             stmt.setString(1, buffer.toText());
             stmt.executeUpdate();
+        }
+    }
+
+    public void insertSearchedBuffer(Polygon buffer) throws SQLException {
+       MultiPolygon multiPolygon = geoFactory.createMultiPolygon(new Polygon[]{buffer});
+       insertSearchedBuffer(multiPolygon);
+    }
+
+    public void insertSearchedBuffer(Geometry buffer) throws SQLException {
+        if(buffer instanceof MultiPolygon){
+            insertSearchedBuffer((MultiPolygon) buffer);
+        } else if (buffer instanceof Polygon){
+            insertSearchedBuffer((Polygon) buffer);
         }
     }
 

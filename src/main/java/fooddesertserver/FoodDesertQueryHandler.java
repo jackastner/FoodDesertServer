@@ -1,19 +1,27 @@
 package fooddesertserver;
 
 import java.io.IOException;
+import java.security.Policy;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import org.osgeo.proj4j.*;
-
 import org.locationtech.jts.geom.*;
+
 import org.locationtech.jts.io.ParseException;
 
 import com.google.maps.errors.ApiException;
 
 import grocerystoresource.GroceryStoreSource;
 import fooddesertdatabase.FoodDesertDatabase;
+import org.osgeo.proj4j.CRSFactory;
+import org.osgeo.proj4j.CoordinateReferenceSystem;
+import org.osgeo.proj4j.CoordinateTransform;
+import org.osgeo.proj4j.CoordinateTransformFactory;
+import org.osgeo.proj4j.ProjCoordinate;
 
 /**
  * @author john
@@ -67,7 +75,12 @@ public class FoodDesertQueryHandler {
     public boolean isInFoodDesert(Coordinate p) throws SQLException, ParseException, ApiException, InterruptedException, IOException {
         Coordinate dbCoord = projSrcToDb(p);
         if(!foodDb.inSearchedBuffer(dbCoord)) {
-            insertPlacesQuery(p);
+            insertAllPlacesQueries(p);
+
+            Point coordPoint = geoFactory.createPoint(projSrcToDb(p));
+            double bufferRadius = getBufferRadiusMeters(p);
+            Polygon buffer = (Polygon) coordPoint.buffer(bufferRadius);
+            foodDb.insertSearchedBuffer(buffer);
         }
         return isInFoodDesertUnchecked(p);
     }
@@ -86,30 +99,40 @@ public class FoodDesertQueryHandler {
         return stores.isEmpty();
     }
 
+    /**
+     * Make a call to the Places API for each coordinate in argument collection and insert the results into the database.
+     *
+     * This method does not update the searched buffer so, the caller must do this themselves.
+     * @param ps Centers of queries
+     */
+    private void insertAllPlacesQueries(Collection<Coordinate> ps) throws InterruptedException, ApiException, IOException, SQLException {
+        Collection<GroceryStore> allStores = new ArrayList<>();
+
+        /* Loop through all coordinates and make queries before database insert.
+         * This lets all results be inserted in a single database transaction */
+        for(Coordinate p : ps){
+            int bufferRadius = (int) getBufferRadiusMeters(p);
+
+            List<GroceryStore> stores = placesClient.nearbyQueryFor(p, bufferRadius)
+                                                    .stream()
+                                                    .map(s -> s.transform(this::projSrcToDb))
+                                                    .collect(Collectors.toList());
+            allStores.addAll(stores);
+        }
+
+        foodDb.insertAll(allStores);
+    }
 
     /**
-     * Make a call to the Places API for a coordinate and insert the result into the database.
-     * @param p Center of query.
-     * @throws InterruptedException
-     * @throws ApiException
-     * @throws IOException
+     * Utility to apply varargs syntax to insertAllPlacesQueries.
+     *
+     * This method does not update the searched buffer so, the caller must do this themselves.
+     * @param ps Centers of queries.
      */
-    private void insertPlacesQuery(Coordinate p) throws InterruptedException, ApiException, IOException, SQLException {
-        double bufferRadius = getBufferRadiusMeters(p);
-
-        /* collect grocery stores from source and project them into the database coordinates
-         * system before inserting into the database. */
-        List<GroceryStore> stores = placesClient.nearbyQueryFor(p, (int) bufferRadius)
-                                                .stream()
-                                                .map(s -> s.transform(this::projSrcToDb))
-                                                .collect(Collectors.toList());
-        foodDb.insertAll(stores);
-
-        /* insert query point and query size into database (after projection).*/
-        Coordinate dbCoord = projSrcToDb(p);
-        Geometry searchedGeometry = geoFactory.createPoint(dbCoord).buffer(bufferRadius, 9);
-        foodDb.insertSearchedBuffer(searchedGeometry);
+    private void insertAllPlacesQueries(Coordinate... ps) throws InterruptedException, SQLException, ApiException, IOException {
+        insertAllPlacesQueries(Arrays.asList(ps));
     }
+
 
     /**
      * Returns all grocery stores in the search frame. Parts of the frame that have been searched are retrieved directly
@@ -136,6 +159,8 @@ public class FoodDesertQueryHandler {
         double radius = getBufferRadiusMeters(unsearchedBuffer.getCoordinate());
         Envelope boundingRect = unsearchedBuffer.getEnvelopeInternal();
 
+        /* This loop collects coordinates to query rather than actualy making the queries. */
+        Collection<Coordinate> queryCoordinates = new ArrayList<>();
         int i = 0;
         double x,y;
         do{
@@ -160,12 +185,19 @@ public class FoodDesertQueryHandler {
                 Geometry buffer = queryPoint.buffer(radius, BUFFER_QUADRANT_SEGMENTS);
 
                 if(buffer.intersects(unsearchedBuffer)){
-                    insertPlacesQuery(projDbToSrc(queryPoint.getCoordinate()));
+                    queryCoordinates.add(projDbToSrc(queryPoint.getCoordinate()));
                 }
                 j++;
+
             } while (yPrime <= boundingRect.getMaxY());
             i++;
         } while(boundingRect.contains(x,y));
+
+        /* place query at each coordinate. */
+        insertAllPlacesQueries(queryCoordinates);
+
+        /* entire area that was unsearched has now been searched */
+        foodDb.insertSearchedBuffer(unsearchedBuffer);
 
         /*project data back to source projection before returning*/
         return foodDb.selectStore(projectedSearchFrame)
