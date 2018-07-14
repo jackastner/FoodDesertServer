@@ -1,16 +1,15 @@
 var map;
 var queryRectangle;
 
-/* Keep track of currently selected part of query envelope*/
-var firstPointSelected;
-var latLng0;
+var voronoiPolygons;
 
 /* Specify how map events should be handled*/
 var currentMapMode;
 var MapMode = Object.freeze({
     coordinateQuery: {}, /* query to api placed for individual points */
-    envelopeQuery: {} /* user selects an envelope that is queried simultaneously. */
-})
+    envelopeQuery: {}, /* user selects an envelope that is queried simultaneously. */
+    voronoiQuery: {}, /* user selects an envelope and voronoi diagram is obtained for store in the envelope */
+});
 
 initControls();
 
@@ -20,9 +19,7 @@ function initControls() {
 
     var submitEnvelopeButton = document.getElementById('queryButton');
 
-    submitEnvelopeButton.onclick = function() {
-        foodDesertEnvelopeQuery(queryRectangle.getBounds().getNorthEast(), queryRectangle.getBounds().getSouthWest(), addGroceryStoreMarker);
-    }
+    submitEnvelopeButton.onclick = handleQueryButtonClick;
 
     document.getElementById('query_coordinate').onclick = function() {
         submitEnvelopeButton.style.visibility='hidden';
@@ -34,6 +31,13 @@ function initControls() {
         submitEnvelopeButton.style.visibility='visible';
         queryRectangle.setMap(map);
         currentMapMode = MapMode.envelopeQuery;
+    }
+
+    voronoiPolygons = [];
+    document.getElementById('query_voronoi').onclick = function() {
+        submitEnvelopeButton.style.visibility='visible';
+        queryRectangle.setMap(map);
+        currentMapMode = MapMode.voronoiQuery;
     }
 }
 
@@ -100,34 +104,60 @@ function setDefaultMap(){
 function handleMapClick(latLng){
     if(currentMapMode === MapMode.coordinateQuery){
         foodDesertPointQuery(latLng, addFoodDesertMarker);
-    } else if (currentMapMode === MapMode.envelopeQuery){
-        if(firstPointSelected){
-            /* One part of the envelope is selected. This click selected the rest, so we can
-             * now send the query */
-            firstPointSelected = false;
-            foodDesertEnvelopeQuery(latLng0, latLng);
-        } else {
-            /* Nothing previously selected. Select first corner of the envelope. */
-            firstPointSelected = true;
-            latLng0 = latLng;
-        }
     }
 }
 
+/* Handles click of submit buttons depending on the map mode */
+function handleQueryButtonClick(){
+    if(currentMapMode === MapMode.envelopeQuery){
+        foodDesertEnvelopeQuery(queryRectangle.getBounds(), addGroceryStoreMarker);
+    } else if (currentMapMode === MapMode.voronoiQuery){
+        /*clear old polygons*/
+        voronoiPolygons.forEach(function (p) {
+            p.setMap(null);
+        });
+        voronoiPolygons = [];
+
+        storeVoronoiQuery(queryRectangle.getBounds(), addVoronoiPolygon);
+    }
+}
+
+/* Construct a GET parameter string for a rectangle defined by bounds*/
+function prepareEnvelopeQuery(bounds){
+    return  'lat0=' + bounds.getNorthEast().lat() + '&lng0=' + bounds.getNorthEast().lng() +
+           '&lat1=' + bounds.getSouthWest().lat() + '&lng1=' + bounds.getSouthWest().lng();
+}
+
+/* Place a call to the server that will return an array of polygons representing the polygons of a Voronoi diagram
+ * generated from the grocery stores with the area specified by bounds. callback is invoked once for each polygon. */
+function storeVoronoiQuery(bounds, callback){
+    var xhr = new XMLHttpRequest();
+    var request = '/voronoi_stores?' + prepareEnvelopeQuery(bounds);
+
+    xhr.open('GET', request, true);
+    xhr.onload = function (e) {
+        if (xhr.readyState === 4 && xhr.status === 200){
+            var polygons = JSON.parse(xhr.responseText);
+            polygons.forEach(function (s) {
+                callback(s);
+            });
+        }
+    }
+    xhr.send(null);
+}
 
 /* Place a call to the server that will return all grocery stores in the envelope defined by the two coordinate
  * pairs. callback is invoked once for each store returned */
-function foodDesertEnvelopeQuery(latLng0, latLng1, callback){
+function foodDesertEnvelopeQuery(bounds, callback){
     var xhr = new XMLHttpRequest();
-    var request = '/locate_stores?lat0=' + latLng0.lat() + '&lng0=' + latLng0.lng() +
-                                '&lat1=' + latLng1.lat() + '&lng1=' + latLng1.lng();
+    var request = '/locate_stores?' + prepareEnvelopeQuery(bounds);
 
     xhr.open('GET', request, true);
     xhr.onload = function (e) {
         if (xhr.readyState === 4 && xhr.status === 200){
             var stores = JSON.parse(xhr.responseText);
             stores.forEach(function (s) {
-                addGroceryStoreMarker(s);
+                callback(s);
             });
         }
     }
@@ -174,4 +204,13 @@ function addGroceryStoreMarker(store){
     marker.addListener('click', function() {
         infowindow.open(map ,marker);
     })
+}
+
+function addVoronoiPolygon(polygon){
+    var mapPolygon = new google.maps.Polygon({
+        paths: polygon,
+        fillOpacity: 0,
+    });
+    mapPolygon.setMap(map);;
+    voronoiPolygons.push(mapPolygon);
 }

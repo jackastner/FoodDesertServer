@@ -7,6 +7,7 @@ import grocerystoresource.GooglePlacesClient;
 import grocerystoresource.GroceryStoreSource;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
+import spark.Request;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -30,11 +31,37 @@ public class FoodDesertServer {
         System.out.println("\t\tgoogle_api_key=$YOUR_API_KEY");
     }
 
-    private static void setupRoutes(FoodDesertQueryHandler queryHandler) {
+    /**
+     * Provides parsing for the common format for search envelopes in get requests.
+     *
+     *  i.e. ?lng0=0&lng1=0&lat0=0&lat1=0
+     *
+     * @param request GET request containing double query params lng0, lng1, lat0, lat1.
+     * @return Envelope constructed from query params parsed as doubles.
+     */
+    private static Envelope parseRequestEnvelope(Request request){
+        double lng0 = Double.parseDouble(request.queryParams("lng0"));
+        double lng1 = Double.parseDouble(request.queryParams("lng1"));
+        double lat0 = Double.parseDouble(request.queryParams("lat0"));
+        double lat1 = Double.parseDouble(request.queryParams("lat1"));
+
+        return new Envelope(lng0, lng1, lat0, lat1);
+    }
+
+    private static Gson buildGson(){
         GsonBuilder builder = new GsonBuilder();
+
         /*custom serialization to rename fields of the Coordinate field*/
         builder.registerTypeAdapter(GroceryStore.class, new GroceryStore.JsonSerializer());
-        Gson gson = builder.create();
+
+        /*custom serialization for VoronoiDiagrams and their underlying GeometryCollection */
+        builder.registerTypeAdapter(VoronoiDiagram.class, new VoronoiDiagram.JsonSerializer());
+
+        return builder.create();
+    }
+
+    private static void setupRoutes(FoodDesertQueryHandler queryHandler) {
+        Gson gson = buildGson();
 
         staticFiles.location("/public");
 
@@ -49,15 +76,19 @@ public class FoodDesertServer {
         });
 
         get("/locate_stores", (request, response) -> {
-            double lng0 = Double.parseDouble(request.queryParams("lng0"));
-            double lng1 = Double.parseDouble(request.queryParams("lng1"));
-            double lat0 = Double.parseDouble(request.queryParams("lat0"));
-            double lat1 = Double.parseDouble(request.queryParams("lat1"));
-            Envelope queryArea = new Envelope(lng0, lng1, lat0, lat1);
+            Envelope queryArea = parseRequestEnvelope(request);
 
             List<GroceryStore> result = queryHandler.getAllGroceryStore(queryArea);
 
-            return  gson.toJson(result);
+            return gson.toJson(result);
+        });
+
+        get("/voronoi_stores", (request, response) -> {
+            Envelope queryArea = parseRequestEnvelope(request);
+
+            VoronoiDiagram result = queryHandler.getVoronoiDiagram(queryArea);
+
+            return gson.toJson(result);
         });
     }
 
