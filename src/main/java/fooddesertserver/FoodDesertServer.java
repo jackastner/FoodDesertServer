@@ -7,6 +7,7 @@ import grocerystoresource.GooglePlacesClient;
 import grocerystoresource.GroceryStoreSource;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Geometry;
 import spark.Request;
 
 import java.io.FileInputStream;
@@ -57,6 +58,8 @@ public class FoodDesertServer {
         /*custom serialization for VoronoiDiagrams and their underlying GeometryCollection */
         builder.registerTypeAdapter(VoronoiDiagram.class, new VoronoiDiagram.JsonSerializer());
 
+        builder.registerTypeAdapter(FoodDesertGeometry.class, new FoodDesertGeometry.JsonSerializer());
+
         return builder.create();
     }
 
@@ -87,6 +90,14 @@ public class FoodDesertServer {
             Envelope queryArea = parseRequestEnvelope(request);
 
             VoronoiDiagram result = queryHandler.getVoronoiDiagram(queryArea);
+
+            return gson.toJson(result);
+        });
+
+        get("/food_deserts", (request, response) -> {
+            Envelope queryArea = parseRequestEnvelope(request);
+
+            FoodDesertGeometry result = queryHandler.getFoodDesertGeometry(queryArea);
 
             return gson.toJson(result);
         });

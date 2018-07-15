@@ -9,6 +9,7 @@ var MapMode = Object.freeze({
     coordinateQuery: {}, /* query to api placed for individual points */
     envelopeQuery: {}, /* user selects an envelope that is queried simultaneously. */
     voronoiQuery: {}, /* user selects an envelope and voronoi diagram is obtained for store in the envelope */
+    foodDesertQuery: {}, /* user selects an envelope and geoms for food deserts in that area are returned.*/
 });
 
 initControls();
@@ -39,6 +40,13 @@ function initControls() {
         queryRectangle.setMap(map);
         currentMapMode = MapMode.voronoiQuery;
     }
+
+    document.getElementById('query_fooddesert').onclick = function() {
+        submitEnvelopeButton.style.visibility='visible';
+        queryRectangle.setMap(map);
+        currentMapMode = MapMode.foodDesertQuery;
+    }
+
 }
 
 /* Initializes the map element on the page as well as creating listeners to
@@ -119,6 +127,8 @@ function handleQueryButtonClick(){
         voronoiPolygons = [];
 
         storeVoronoiQuery(queryRectangle.getBounds(), addVoronoiPolygon);
+    } else if (currentMapMode === MapMode.foodDesertQuery){
+        foodDesertQuery(queryRectangle.getBounds(), addFoodDesertPolygon);
     }
 }
 
@@ -126,6 +136,22 @@ function handleQueryButtonClick(){
 function prepareEnvelopeQuery(bounds){
     return  'lat0=' + bounds.getNorthEast().lat() + '&lng0=' + bounds.getNorthEast().lng() +
            '&lat1=' + bounds.getSouthWest().lat() + '&lng1=' + bounds.getSouthWest().lng();
+}
+
+function foodDesertQuery(bounds, callback){
+    var xhr = new XMLHttpRequest();
+    var request = '/food_deserts?' + prepareEnvelopeQuery(bounds);
+
+    xhr.open('GET', request, true);
+    xhr.onload = function (e) {
+        if (xhr.readyState === 4 && xhr.status === 200){
+            var polygons = JSON.parse(xhr.responseText);
+            polygons.forEach(function (s) {
+                callback(s);
+            });
+        }
+    }
+    xhr.send(null);
 }
 
 /* Place a call to the server that will return an array of polygons representing the polygons of a Voronoi diagram
@@ -213,4 +239,12 @@ function addVoronoiPolygon(polygon){
     });
     mapPolygon.setMap(map);;
     voronoiPolygons.push(mapPolygon);
+}
+
+function addFoodDesertPolygon(polygon){
+    var mapPolygon = new google.maps.Polygon({
+        paths: polygon,
+        fillOpacity: 0,
+    });
+    mapPolygon.setMap(map);;
 }

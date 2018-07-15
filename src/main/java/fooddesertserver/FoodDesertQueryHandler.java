@@ -239,6 +239,27 @@ public class FoodDesertQueryHandler {
         return getVoronoiDiagram(geoFactory.toGeometry(searchFrame));
     }
 
+    public FoodDesertGeometry getFoodDesertGeometry(Geometry searchFrame) throws SQLException, ParseException {
+        List<GroceryStore> stores = getAllGroceryStores(searchFrame);
+        Geometry union = geoFactory.createGeometryCollection();
+
+
+        for(GroceryStore store : stores){
+            Coordinate location = projSrcToDb(store.getLocation());
+            double radius = getBufferRadiusMeters(location);
+            Geometry buffer  = geoFactory.createPoint(location).buffer(radius);
+
+            union = union.union(buffer);
+        }
+
+        Geometry foodDeserts = searchFrame.difference(new PointTransformer(this::projDbToSrc).transform(union));
+        return new FoodDesertGeometry(foodDeserts);
+    }
+
+    public FoodDesertGeometry getFoodDesertGeometry(Envelope searchFrame) throws SQLException, ParseException {
+        return getFoodDesertGeometry(geoFactory.toGeometry(searchFrame));
+    }
+
     /**
      * Generate a buffer radius around a point that represents the area in which
      * there must be a grocery store for the point to not be in a food

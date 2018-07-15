@@ -28,7 +28,9 @@ public class VoronoiDiagram {
             for (int i = 0; i < src.diagram.getNumGeometries(); i++) {
                 /* Polygons in a Voronoi Diagram should not have interior rings*/
                 Polygon poly = (Polygon) src.diagram.getGeometryN(i);
+
                 LineString ext = poly.getExteriorRing();
+
 
                 JsonArray vertices = new JsonArray();
                 for(Coordinate coord : ext.getCoordinates()) {
@@ -43,5 +45,7 @@ public class VoronoiDiagram {
 
             return diagram;
         }
+
+
     }
 }
