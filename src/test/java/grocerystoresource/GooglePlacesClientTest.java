@@ -22,7 +22,7 @@ public class GooglePlacesClientTest {
 
     private static String googleApiKey;
 
-    private GroceryStoreSource placeClient;
+    private GooglePlacesClient placeClient;
     private Coordinate collegePark;
     private Coordinate nullPoint;
 

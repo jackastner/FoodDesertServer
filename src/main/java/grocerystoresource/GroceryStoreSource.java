@@ -1,10 +1,8 @@
 package grocerystoresource;
 
-import com.google.maps.errors.ApiException;
 import fooddesertserver.GroceryStore;
 import org.locationtech.jts.geom.Coordinate;
 
-import java.io.IOException;
 import java.util.List;
 
 /**
@@ -20,8 +18,8 @@ public interface GroceryStoreSource {
      * @param radius Radius in meters around the query point to search for grocery stores.
      * @return A list of grocery stores found in that area.
      */
-    List<GroceryStore> nearbyQueryFor(Coordinate location, int radius)
-            throws ApiException, InterruptedException, IOException;
+    List<GroceryStore> nearbyQueryFor(Coordinate location, int radius) throws Exception;
+
 
     /**
      * @return The Coordinate reference system used to encode stores returned by this source.

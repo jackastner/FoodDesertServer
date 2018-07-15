@@ -1,14 +1,14 @@
 package fooddesertserver;
 
-import com.google.maps.errors.ApiException;
 import fooddesertdatabase.FoodDesertDatabase;
 import grocerystoresource.GroceryStoreSource;
 import org.locationtech.jts.geom.*;
 import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.triangulate.VoronoiDiagramBuilder;
 import org.osgeo.proj4j.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,6 +25,8 @@ import java.util.stream.Collectors;
  * This class is thread safe. See FoodDesertDatabase and GooglePlacesClient for details.
  */
 public class FoodDesertQueryHandler {
+
+    private final Logger logger = LoggerFactory.getLogger(FoodDesertQueryHandler.class);
 
     /* Input and output coordinates for Proj4j can be reused but, each thread requires its own copy. */
     private static final ThreadLocal<ProjCoordinate> projInput  = ThreadLocal.withInitial(ProjCoordinate::new),
@@ -65,7 +67,7 @@ public class FoodDesertQueryHandler {
      * the local database and the google places API. New data obtained from the places
      * API is added to the database.
      */
-    public boolean isInFoodDesert(Coordinate p) throws SQLException, ParseException, ApiException, InterruptedException, IOException {
+    public boolean isInFoodDesert(Coordinate p) throws SQLException, ParseException{
         Coordinate dbCoord = projSrcToDb(p);
         if(!foodDb.inSearchedBuffer(dbCoord)) {
             insertAllPlacesQueries(p);
@@ -98,7 +100,7 @@ public class FoodDesertQueryHandler {
      * This method does not update the searched buffer so, the caller must do this themselves.
      * @param ps Centers of queries
      */
-    private void insertAllPlacesQueries(Collection<Coordinate> ps) throws InterruptedException, ApiException, IOException, SQLException {
+    private void insertAllPlacesQueries(Collection<Coordinate> ps) throws SQLException {
         Collection<GroceryStore> allStores = new ArrayList<>();
 
         /* Loop through all coordinates and make queries before database insert.
@@ -106,11 +108,16 @@ public class FoodDesertQueryHandler {
         for(Coordinate p : ps){
             int bufferRadius = (int) getBufferRadiusMeters(p);
 
-            List<GroceryStore> stores = placesClient.nearbyQueryFor(p, bufferRadius)
-                                                    .stream()
-                                                    .map(s -> s.transform(this::projSrcToDb))
-                                                    .collect(Collectors.toList());
-            allStores.addAll(stores);
+            try {
+                List<GroceryStore> stores = placesClient.nearbyQueryFor(p, bufferRadius)
+                                        .stream()
+                                        .map(s -> s.transform(this::projSrcToDb))
+                                        .collect(Collectors.toList());
+                allStores.addAll(stores);
+            } catch (Exception e){
+                logger.error("Exception while querying GroceryStoreSource. Ignoring and treating response as empty.", e);
+            }
+
         }
 
         foodDb.insertAll(allStores);
@@ -122,7 +129,7 @@ public class FoodDesertQueryHandler {
      * This method does not update the searched buffer so, the caller must do this themselves.
      * @param ps Centers of queries.
      */
-    private void insertAllPlacesQueries(Coordinate... ps) throws InterruptedException, SQLException, ApiException, IOException {
+    private void insertAllPlacesQueries(Coordinate... ps) throws SQLException {
         insertAllPlacesQueries(Arrays.asList(ps));
     }
 
@@ -135,7 +142,7 @@ public class FoodDesertQueryHandler {
      * @param searchFrame Area being searched for stores.
      * @return All stores within search frame.
      */
-    public List<GroceryStore> getAllGroceryStores(Geometry searchFrame) throws SQLException, ParseException, InterruptedException, ApiException, IOException {
+    public List<GroceryStore> getAllGroceryStores(Geometry searchFrame) throws SQLException, ParseException {
         /* This implementation should now be optimal for a fixed query radius because it uses a hexagonal tiling of
          * circles. This produces minimal overlap between the query areas. Further improvement could come from dynamically
          * increasing the size of query circles.
@@ -190,7 +197,11 @@ public class FoodDesertQueryHandler {
         insertAllPlacesQueries(queryCoordinates);
 
         /* entire area that was unsearched has now been searched */
-        foodDb.insertSearchedBuffer(unsearchedBuffer);
+        if(unsearchedBuffer.isValid()){
+            foodDb.insertSearchedBuffer(unsearchedBuffer);
+        } else {
+            throw new IllegalStateException("Unsearched buffer was invalid");
+        }
 
         /*project data back to source projection before returning*/
         return foodDb.selectStore(projectedSearchFrame)
@@ -206,12 +217,12 @@ public class FoodDesertQueryHandler {
      * @param searchFrame Area being searched.
      * @return All stores withing the search frame.
      */
-    public List<GroceryStore> getAllGroceryStore(Envelope searchFrame) throws InterruptedException, SQLException, ApiException, ParseException, IOException {
+    public List<GroceryStore> getAllGroceryStore(Envelope searchFrame) throws  SQLException,  ParseException {
         return getAllGroceryStores(geoFactory.toGeometry(searchFrame));
     }
 
 
-    public VoronoiDiagram getVoronoiDiagram(Geometry searchFrame) throws InterruptedException, SQLException, ApiException, ParseException, IOException {
+    public VoronoiDiagram getVoronoiDiagram(Geometry searchFrame) throws  SQLException,  ParseException {
         List<Coordinate>  diagramSites = this.getAllGroceryStores(searchFrame)
                                              .stream()
                                              .map(GroceryStore::getLocation)
@@ -224,7 +235,7 @@ public class FoodDesertQueryHandler {
         return new VoronoiDiagram(diagramBuilder, geoFactory);
     }
 
-    public VoronoiDiagram getVoronoiDiagram(Envelope searchFrame) throws InterruptedException, SQLException, ApiException, ParseException, IOException {
+    public VoronoiDiagram getVoronoiDiagram(Envelope searchFrame) throws SQLException, ParseException{
         return getVoronoiDiagram(geoFactory.toGeometry(searchFrame));
     }
 

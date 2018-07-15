@@ -38,7 +38,6 @@ Once the server is running, the web interface is available at http://localhost:4
 * Resolve error: GEOS error: TopologyException: Input geom 1 is invalid: Too few points in geometry component at or near point
   * Possibly resolve by checking geom.isValid() and failing gracefully if not.
   * Could call MakeValid on geometries in SQL.
-* Graceful handling of failed Places API queries.
 * Obtain and display polygon(s) representing areas that are food deserts.
   * Generate these polygons using walking distance (rather than Euclidean distance). 
   * Account for location in these polygons. In Suburban and rural areas, distance to a grocery store can be much larger without being a food desert.
