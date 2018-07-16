@@ -4,6 +4,7 @@ import fooddesertdatabase.FoodDesertDatabase;
 import grocerystoresource.GroceryStoreSource;
 import org.locationtech.jts.geom.*;
 import org.locationtech.jts.io.ParseException;
+import org.locationtech.jts.simplify.VWSimplifier;
 import org.locationtech.jts.triangulate.VoronoiDiagramBuilder;
 import org.osgeo.proj4j.*;
 import org.slf4j.Logger;
@@ -156,8 +157,18 @@ public class FoodDesertQueryHandler {
         Geometry projectedSearchFrame = new PointTransformer(this::projSrcToDb).transform(searchFrame);
         Geometry unsearchedBuffer = foodDb.selectUnsearchedBuffer(projectedSearchFrame);
 
-        double radius = getBufferRadiusMeters(unsearchedBuffer.getCoordinate());
-        Envelope boundingRect = unsearchedBuffer.getEnvelopeInternal();
+        VWSimplifier simplifier = new VWSimplifier(unsearchedBuffer);
+        simplifier.setDistanceTolerance(1);
+        simplifier.setEnsureValid(true);
+        Geometry simpleUnsearchedBuffer = simplifier.getResultGeometry();
+
+        double radius = getBufferRadiusMeters(simpleUnsearchedBuffer.getCoordinate());
+        Envelope boundingRect = simpleUnsearchedBuffer.getEnvelopeInternal();
+
+        if(!simpleUnsearchedBuffer.isValid()){
+            throw new IllegalStateException("Unsearched buffer was invalid! Check database and correct any invalid geometries." +
+                simpleUnsearchedBuffer.toText());
+        }
 
         /* This loop collects coordinates to query rather than actualy making the queries. */
         Collection<Coordinate> queryCoordinates = new ArrayList<>();
@@ -184,7 +195,7 @@ public class FoodDesertQueryHandler {
                  * The solution was to change the number of segments used in the buffer to a number divisible by 6. */
                 Geometry buffer = queryPoint.buffer(radius, BUFFER_QUADRANT_SEGMENTS);
 
-                if(buffer.intersects(unsearchedBuffer)){
+                if(buffer.intersects(simpleUnsearchedBuffer)){
                     queryCoordinates.add(projDbToSrc(queryPoint.getCoordinate()));
                 }
                 j++;
@@ -197,11 +208,7 @@ public class FoodDesertQueryHandler {
         insertAllPlacesQueries(queryCoordinates);
 
         /* entire area that was unsearched has now been searched */
-        if(unsearchedBuffer.isValid()){
-            foodDb.insertSearchedBuffer(unsearchedBuffer);
-        } else {
-            throw new IllegalStateException("Unsearched buffer was invalid");
-        }
+        foodDb.insertSearchedBuffer(simpleUnsearchedBuffer);
 
         /*project data back to source projection before returning*/
         return foodDb.selectStore(projectedSearchFrame)
@@ -240,9 +247,13 @@ public class FoodDesertQueryHandler {
     }
 
     public FoodDesertGeometry getFoodDesertGeometry(Geometry searchFrame) throws SQLException, ParseException {
-        List<GroceryStore> stores = getAllGroceryStores(searchFrame);
-        Geometry union = geoFactory.createGeometryCollection();
+        /* Buffer search frame to account for stores outside of search frame that still effect food desert status. */
+        Geometry projectedSearchFrame = new PointTransformer(this::projSrcToDb).transform(searchFrame);
+        Geometry bufferedSearchFrame = projectedSearchFrame.buffer(getBufferRadiusMeters(projectedSearchFrame.getCoordinate()));
+        Geometry srcBufferedSearchFrame  = new PointTransformer(this::projDbToSrc).transform(bufferedSearchFrame);
 
+        List<GroceryStore> stores = getAllGroceryStores(srcBufferedSearchFrame);
+        Geometry union = geoFactory.createGeometryCollection();
 
         for(GroceryStore store : stores){
             Coordinate location = projSrcToDb(store.getLocation());
