@@ -4,40 +4,16 @@
         <title>Food Desert Map</title>
         <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
         <meta charset="utf-8">
-        <style>
-            /* Always set the map height explicitly to define the size of the div
-             * element that contains the map. */
-             #map {
-                 height: 100%;
-             }
-             /* Optional: Makes the sample page fill the window. */
-             html, body {
-                 height: 100%;
-                 margin: 0;
-                 padding: 0;
-             }
-
-             #controls {
-                 position: fixed;
-                 top: 7%;
-                 left: 0;
-                 background-color: rgba(0,0,0,0.5);
-                 color: white;
-                 border: solid black;
-             }
-
-             #queryButton {
-                 position: fixed;
-                 bottom: 3%;
-                 left: 50%;
-                 transform: translateX(-50%);
-             }
-        </style>
+        <link rel="stylesheet" href= "food_desert_map.css">
     </head>
 
     <body>
         <div id="map"></div>
         <div id="controls">
+            Modes:
+
+            <br>
+
             <input type="radio" name="mapMode" id="query_coordinate" value="query_coordinate">
             <label for="query_coordinate">Query Coordinate</label>
 
@@ -55,6 +31,19 @@
 
             <input type="radio" name="mapMode" id="query_fooddesert" value="query_fooddesert">
             <label for="query_fooddesert">Query Food Desert</label>
+
+            <hr>
+
+            Controls:
+
+            <br>
+
+            <button id="clearButton">Clear Markers</button>
+
+            <br>
+
+            <button id="resetRectButton">Reset Query Rectangle</button>
+
         </div>
 
         <button id="queryButton">Submit Envelope Query</button>

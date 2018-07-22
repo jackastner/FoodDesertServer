@@ -1,7 +1,9 @@
 var map;
 var queryRectangle;
 
+var storeMarkers;
 var voronoiPolygons;
+var foodDesertPolygons;
 
 /* Specify how map events should be handled*/
 var currentMapMode;
@@ -19,8 +21,9 @@ function initControls() {
     currentMapMode = MapMode.envelopeQuery;
 
     var submitEnvelopeButton = document.getElementById('queryButton');
-
     submitEnvelopeButton.onclick = handleQueryButtonClick;
+
+    /* map mode buttons */
 
     document.getElementById('query_coordinate').onclick = function() {
         submitEnvelopeButton.style.visibility='hidden';
@@ -28,6 +31,7 @@ function initControls() {
         currentMapMode = MapMode.coordinateQuery;
     }
 
+    storeMarkers = [];
     document.getElementById('query_envelope').onclick = function() {
         submitEnvelopeButton.style.visibility='visible';
         queryRectangle.setMap(map);
@@ -41,12 +45,22 @@ function initControls() {
         currentMapMode = MapMode.voronoiQuery;
     }
 
+    foodDesertPolygons = [];
     document.getElementById('query_fooddesert').onclick = function() {
         submitEnvelopeButton.style.visibility='visible';
         queryRectangle.setMap(map);
         currentMapMode = MapMode.foodDesertQuery;
     }
 
+    /* overlay control buttons */
+
+    document.getElementById('clearButton').onclick = function() {
+        handleClearButtonClick();
+    }
+
+    document.getElementById('resetRectButton').onclick = function() {
+        resetQueryRectangle();
+    }
 }
 
 /* Initializes the map element on the page as well as creating listeners to
@@ -61,6 +75,7 @@ function initMap() {
         if((location.protocol === 'https:') && navigator.geolocation){
              navigator.geolocation.getCurrentPosition( function (latlng) {
                  map.setCenter({lat: latlng.coords.latitude, lng: latlng.coords.longitude});
+                 map.setZoom(10);
                  queryRectangle = new google.maps.Rectangle({
                      fillOpacity: 0.33,
                      fillColor: '#FF0000',
@@ -74,7 +89,7 @@ function initMap() {
                          west: latlng.coords.longitude - 0.1
                      }
                  })
-                 map.setZoom(10);
+                 resetQueryRectangle();
             });
         } else {
             setDefaultMap();
@@ -88,10 +103,11 @@ function initMap() {
     map.addListener('click', e => handleMapClick(e.latLng));
 }
 
+/* When the users location cannot be determined, the map view is set to a
+ * default view points centered at 0 lat, 0 lng.*/
 function setDefaultMap(){
     map.setCenter({lat: 0, lng:0});
     map.setZoom(1);
-    var center = map.getCenter();
 
     queryRectangle = new google.maps.Rectangle({
         fillOpacity: 0.33,
@@ -99,13 +115,55 @@ function setDefaultMap(){
         map:map,
         editable: true,
         draggable: true,
-        bounds: {
-            north: 10,
-            south: -10,
-            east: 10,
-            west: -10
-        }
     });
+
+   resetQueryRectangle();
+}
+
+/* Removes all map decorations from the google map. */
+function handleClearButtonClick() {
+    clearMapElements(storeMarkers);
+    clearMapElements(voronoiPolygons);
+    clearMapElements(foodDesertPolygons);
+}
+
+/* Set the query rectangles bounds to a default position in the center of the view */
+function resetQueryRectangle(){
+    var bounds = map.getBounds();
+
+    if (bounds === undefined){
+       /*Bounds is undefined when the map is not fully loaded. Wait for load to finish then try again.*/
+       var boundsChangedListener = google.maps.event.addListener(map, 'tilesloaded', function () {
+           boundsChangedListener.remove();
+           resetQueryRectangle();
+       });
+    } else {
+        var center = bounds.getCenter();
+        var width = bounds.toSpan().lng() / 10.0;
+        var height = bounds.toSpan().lat() / 10.0;
+
+        var south = center.lat() - height / 2.0;
+        var west = center.lng() - width / 2.0;
+
+        queryRectangle.setBounds({
+            south: south,
+            west: west,
+            north: south + height,
+            east: west + width
+        });
+    }
+}
+
+/* Remove move all map decorations in an array from the google map
+ * and clear the array */
+function clearMapElements(elementArray) {
+    /*remove all elements from array */
+    elementArray.forEach(function (p) {
+        p.setMap(null);
+    });
+
+    /* clear the array */
+    elementArray.length = 0;
 }
 
 /*Handles a map click depending on the map mode selected*/
@@ -118,16 +176,13 @@ function handleMapClick(latLng){
 /* Handles click of submit buttons depending on the map mode */
 function handleQueryButtonClick(){
     if(currentMapMode === MapMode.envelopeQuery){
+        clearMapElements(storeMarkers);
         foodDesertEnvelopeQuery(queryRectangle.getBounds(), addGroceryStoreMarker);
     } else if (currentMapMode === MapMode.voronoiQuery){
-        /*clear old polygons*/
-        voronoiPolygons.forEach(function (p) {
-            p.setMap(null);
-        });
-        voronoiPolygons = [];
-
+        clearMapElements(voronoiPolygons);
         storeVoronoiQuery(queryRectangle.getBounds(), addVoronoiPolygon);
     } else if (currentMapMode === MapMode.foodDesertQuery){
+        clearMapElements(foodDesertPolygons);
         foodDesertQuery(queryRectangle.getBounds(), addFoodDesertPolygon);
     }
 }
@@ -138,6 +193,8 @@ function prepareEnvelopeQuery(bounds){
            '&lat1=' + bounds.getSouthWest().lat() + '&lng1=' + bounds.getSouthWest().lng();
 }
 
+/* Place a call to the server that will return an array of polygons that represents the area within the query bounds
+ * that is a food desert. callback is invoked once for each polygon returned. */
 function foodDesertQuery(bounds, callback){
     var xhr = new XMLHttpRequest();
     var request = '/food_deserts?' + prepareEnvelopeQuery(bounds);
@@ -223,6 +280,8 @@ function addGroceryStoreMarker(store){
         map: map,
     })
 
+    storeMarkers.push(marker);
+
     var infowindow = new google.maps.InfoWindow({
         content: store.name
     })
@@ -236,6 +295,7 @@ function addVoronoiPolygon(polygon){
     var mapPolygon = new google.maps.Polygon({
         paths: polygon,
         fillOpacity: 0,
+        clickable: false,
     });
     mapPolygon.setMap(map);;
     voronoiPolygons.push(mapPolygon);
@@ -244,7 +304,10 @@ function addVoronoiPolygon(polygon){
 function addFoodDesertPolygon(polygon){
     var mapPolygon = new google.maps.Polygon({
         paths: polygon,
-        fillOpacity: 0,
+        fillOpacity: 0.5,
+        fillColor: '#FF0000',
+        clickable: false,
     });
-    mapPolygon.setMap(map);;
+    mapPolygon.setMap(map);
+    foodDesertPolygons.push(mapPolygon);
 }
