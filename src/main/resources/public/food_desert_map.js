@@ -1,6 +1,9 @@
 var map;
+
+/* This is the draggable rectangle overlay. */
 var queryRectangle;
 
+/* keep track of decorations added to the map so they can be remove later */
 var storeMarkers;
 var voronoiPolygons;
 var foodDesertPolygons;
@@ -15,6 +18,11 @@ var MapMode = Object.freeze({
 });
 
 initControls();
+
+
+/****************************************
+ * Initialization code
+ ****************************************/
 
 /* Initializes listeners for controls overlay on map */
 function initControls() {
@@ -80,7 +88,8 @@ function initControls() {
 }
 
 /* Initializes the map element on the page as well as creating listeners to
- * handle events on the map element */
+ * handle events on the map element. This function is the callback passed to
+ * the google maps script tag. */
 function initMap() {
     /* Create map element for this page */
     map = new google.maps.Map(document.getElementById('map'));
@@ -136,6 +145,11 @@ function setDefaultMap(){
    resetQueryRectangle();
 }
 
+
+/****************************************
+ * Event Handlers
+ ****************************************/
+
 /* Removes all map decorations from the google map. */
 function handleClearButtonClick() {
     clearMapElements(storeMarkers);
@@ -143,44 +157,6 @@ function handleClearButtonClick() {
     clearMapElements(foodDesertPolygons);
 }
 
-/* Set the query rectangles bounds to a default position in the center of the view */
-function resetQueryRectangle(){
-    var bounds = map.getBounds();
-
-    if (bounds === undefined){
-       /*Bounds is undefined when the map is not fully loaded. Wait for load to finish then try again.*/
-       var boundsChangedListener = google.maps.event.addListener(map, 'tilesloaded', function () {
-           boundsChangedListener.remove();
-           resetQueryRectangle();
-       });
-    } else {
-        var center = bounds.getCenter();
-        var width = bounds.toSpan().lng() / 10.0;
-        var height = bounds.toSpan().lat() / 10.0;
-
-        var south = center.lat() - height / 2.0;
-        var west = center.lng() - width / 2.0;
-
-        queryRectangle.setBounds({
-            south: south,
-            west: west,
-            north: south + height,
-            east: west + width
-        });
-    }
-}
-
-/* Remove move all map decorations in an array from the google map
- * and clear the array */
-function clearMapElements(elementArray) {
-    /*remove all elements from array */
-    elementArray.forEach(function (p) {
-        p.setMap(null);
-    });
-
-    /* clear the array */
-    elementArray.length = 0;
-}
 
 /*Handles a map click depending on the map mode selected*/
 function handleMapClick(latLng){
@@ -203,11 +179,10 @@ function handleQueryButtonClick(){
     }
 }
 
-/* Construct a GET parameter string for a rectangle defined by bounds*/
-function prepareEnvelopeQuery(bounds){
-    return  'lat0=' + bounds.getNorthEast().lat() + '&lng0=' + bounds.getNorthEast().lng() +
-           '&lat1=' + bounds.getSouthWest().lat() + '&lng1=' + bounds.getSouthWest().lng();
-}
+
+/****************************************
+ * API call functions
+ ****************************************/
 
 /* Place a call to the server that will return an array of polygons that represents the area within the query bounds
  * that is a food desert. */
@@ -281,6 +256,17 @@ function foodDesertPointQuery(latLng){
     xhr.send(null);
 }
 
+/* Construct a GET parameter string for a rectangle defined by bounds*/
+function prepareEnvelopeQuery(bounds){
+    return  'lat0=' + bounds.getNorthEast().lat() + '&lng0=' + bounds.getNorthEast().lng() +
+           '&lat1=' + bounds.getSouthWest().lat() + '&lng1=' + bounds.getSouthWest().lng();
+}
+
+
+/****************************************
+ * Map marker/geometry control functions
+ ****************************************/
+
 /* Construct a new maker for the map  to indicate if a location is in a
  * food desert */
 function addFoodDesertMarker(latLng, isInFoodDesert){
@@ -329,6 +315,50 @@ function addFoodDesertPolygon(polygon){
     mapPolygon.setMap(map);
     foodDesertPolygons.push(mapPolygon);
 }
+
+/* Set the query rectangles bounds to a default position in the center of the view */
+function resetQueryRectangle(){
+    var bounds = map.getBounds();
+
+    if (bounds === undefined){
+       /*Bounds is undefined when the map is not fully loaded. Wait for load to finish then try again.*/
+       var boundsChangedListener = google.maps.event.addListener(map, 'tilesloaded', function () {
+           boundsChangedListener.remove();
+           resetQueryRectangle();
+       });
+    } else {
+        var center = bounds.getCenter();
+        var width = bounds.toSpan().lng() / 10.0;
+        var height = bounds.toSpan().lat() / 10.0;
+
+        var south = center.lat() - height / 2.0;
+        var west = center.lng() - width / 2.0;
+
+        queryRectangle.setBounds({
+            south: south,
+            west: west,
+            north: south + height,
+            east: west + width
+        });
+    }
+}
+
+/* Remove move all map decorations in an array from the google map
+ * and clear the array */
+function clearMapElements(elementArray) {
+    /*remove all elements from array */
+    elementArray.forEach(function (p) {
+        p.setMap(null);
+    });
+
+    /* clear the array */
+    elementArray.length = 0;
+}
+
+
+/****************************************
+ * Statistics display control functions
+ ****************************************/
 
 function updateFoodDesertStats(foodDesertArea, totalArea){
     document.getElementById('food_desert_area').innerHTML = (foodDesertArea / (1000*1000)).toFixed(2) + " km<sup>2</sup>";
