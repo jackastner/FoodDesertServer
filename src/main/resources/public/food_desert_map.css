@@ -11,19 +11,32 @@ html, body {
     padding: 0;
 }
 
-#controls {
+.map_overlay {
     position: fixed;
-    top: 7%;
-    left: 0;
     background-color: rgba(0,0,0,0.5);
     color: white;
     border: solid black;
+    border-radius: 5px;
+}
+
+.overlay_head {
+    text-align:center;
+}
+
+#controls {
+    top: 7%;
+    left: 1px;
 }
 
 #controls > button {
     margin-left: 5%;
     margin-right: 5%;
     width: 90%;
+}
+
+#stats {
+    top: 7%;
+    right: 1px;
 }
 
 #queryButton {

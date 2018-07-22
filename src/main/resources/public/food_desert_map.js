@@ -23,10 +23,17 @@ function initControls() {
     var submitEnvelopeButton = document.getElementById('queryButton');
     submitEnvelopeButton.onclick = handleQueryButtonClick;
 
+    var stats = document.getElementById('stats');
+    var storeStats = document.getElementById('store_stats');
+    var desertStats = document.getElementById('food_desert_stats');
+
     /* map mode buttons */
 
     document.getElementById('query_coordinate').onclick = function() {
         submitEnvelopeButton.style.visibility='hidden';
+        storeStats.style.visibility='collapse';
+        desertStats.style.visibility='collapse';
+        stats.style.visibility='hidden';
         queryRectangle.setMap(null);
         currentMapMode = MapMode.coordinateQuery;
     }
@@ -34,6 +41,9 @@ function initControls() {
     storeMarkers = [];
     document.getElementById('query_envelope').onclick = function() {
         submitEnvelopeButton.style.visibility='visible';
+        stats.style.visibility='visible';
+        storeStats.style.visibility='visible';
+        desertStats.style.visibility='collapse';
         queryRectangle.setMap(map);
         currentMapMode = MapMode.envelopeQuery;
     }
@@ -41,6 +51,9 @@ function initControls() {
     voronoiPolygons = [];
     document.getElementById('query_voronoi').onclick = function() {
         submitEnvelopeButton.style.visibility='visible';
+        stats.style.visibility='visible';
+        storeStats.style.visibility='visible';
+        desertStats.style.visibility='collapse';
         queryRectangle.setMap(map);
         currentMapMode = MapMode.voronoiQuery;
     }
@@ -48,6 +61,9 @@ function initControls() {
     foodDesertPolygons = [];
     document.getElementById('query_fooddesert').onclick = function() {
         submitEnvelopeButton.style.visibility='visible';
+        stats.style.visibility='visible';
+        storeStats.style.visibility='collapse';
+        desertStats.style.visibility='visible';
         queryRectangle.setMap(map);
         currentMapMode = MapMode.foodDesertQuery;
     }
@@ -169,7 +185,7 @@ function clearMapElements(elementArray) {
 /*Handles a map click depending on the map mode selected*/
 function handleMapClick(latLng){
     if(currentMapMode === MapMode.coordinateQuery){
-        foodDesertPointQuery(latLng, addFoodDesertMarker);
+        foodDesertPointQuery(latLng);
     }
 }
 
@@ -177,13 +193,13 @@ function handleMapClick(latLng){
 function handleQueryButtonClick(){
     if(currentMapMode === MapMode.envelopeQuery){
         clearMapElements(storeMarkers);
-        foodDesertEnvelopeQuery(queryRectangle.getBounds(), addGroceryStoreMarker);
+        foodDesertEnvelopeQuery(queryRectangle.getBounds(), );
     } else if (currentMapMode === MapMode.voronoiQuery){
         clearMapElements(voronoiPolygons);
-        storeVoronoiQuery(queryRectangle.getBounds(), addVoronoiPolygon);
+        storeVoronoiQuery(queryRectangle.getBounds());
     } else if (currentMapMode === MapMode.foodDesertQuery){
         clearMapElements(foodDesertPolygons);
-        foodDesertQuery(queryRectangle.getBounds(), addFoodDesertPolygon);
+        foodDesertQuery(queryRectangle.getBounds());
     }
 }
 
@@ -194,18 +210,21 @@ function prepareEnvelopeQuery(bounds){
 }
 
 /* Place a call to the server that will return an array of polygons that represents the area within the query bounds
- * that is a food desert. callback is invoked once for each polygon returned. */
-function foodDesertQuery(bounds, callback){
+ * that is a food desert. */
+function foodDesertQuery(bounds){
     var xhr = new XMLHttpRequest();
     var request = '/food_deserts?' + prepareEnvelopeQuery(bounds);
 
     xhr.open('GET', request, true);
     xhr.onload = function (e) {
         if (xhr.readyState === 4 && xhr.status === 200){
-            var polygons = JSON.parse(xhr.responseText);
-            polygons.forEach(function (s) {
-                callback(s);
-            });
+            var result = JSON.parse(xhr.responseText);
+
+            var foodDesertArea = result.desert_area;
+            var totalArea = result.total_area;
+            updateFoodDesertStats(foodDesertArea, totalArea);
+
+            result.desert_geom.forEach(addFoodDesertPolygon);
         }
     }
     xhr.send(null);
@@ -213,7 +232,7 @@ function foodDesertQuery(bounds, callback){
 
 /* Place a call to the server that will return an array of polygons representing the polygons of a Voronoi diagram
  * generated from the grocery stores with the area specified by bounds. callback is invoked once for each polygon. */
-function storeVoronoiQuery(bounds, callback){
+function storeVoronoiQuery(bounds){
     var xhr = new XMLHttpRequest();
     var request = '/voronoi_stores?' + prepareEnvelopeQuery(bounds);
 
@@ -221,9 +240,9 @@ function storeVoronoiQuery(bounds, callback){
     xhr.onload = function (e) {
         if (xhr.readyState === 4 && xhr.status === 200){
             var polygons = JSON.parse(xhr.responseText);
-            polygons.forEach(function (s) {
-                callback(s);
-            });
+            console.log(polygons.length);
+            updateStoresStats(polygons.length);
+            polygons.forEach(addVoronoiPolygon);
         }
     }
     xhr.send(null);
@@ -231,7 +250,7 @@ function storeVoronoiQuery(bounds, callback){
 
 /* Place a call to the server that will return all grocery stores in the envelope defined by the two coordinate
  * pairs. callback is invoked once for each store returned */
-function foodDesertEnvelopeQuery(bounds, callback){
+function foodDesertEnvelopeQuery(bounds){
     var xhr = new XMLHttpRequest();
     var request = '/locate_stores?' + prepareEnvelopeQuery(bounds);
 
@@ -239,9 +258,8 @@ function foodDesertEnvelopeQuery(bounds, callback){
     xhr.onload = function (e) {
         if (xhr.readyState === 4 && xhr.status === 200){
             var stores = JSON.parse(xhr.responseText);
-            stores.forEach(function (s) {
-                callback(s);
-            });
+            updateStoresStats(stores.length);
+            stores.forEach(addGroceryStoreMarker);
         }
     }
     xhr.send(null);
@@ -249,7 +267,7 @@ function foodDesertEnvelopeQuery(bounds, callback){
 
 /* Make an async call to the food desert server to determine if a given point is
  * in a food desert. Callback should be of type LatLng -> Boolean -> a */
-function foodDesertPointQuery(latLng, callback){
+function foodDesertPointQuery(latLng){
     var xhr = new XMLHttpRequest();
     var request = '/is_in_food_desert?lat=' + latLng.lat() + '&lng=' + latLng.lng();
 
@@ -257,7 +275,7 @@ function foodDesertPointQuery(latLng, callback){
     xhr.onload = function (e) {
         if (xhr.readyState === 4 && xhr.status === 200){
             var isInFoodDesert = JSON.parse(xhr.responseText);
-            callback(latLng, isInFoodDesert);
+            addFoodDesertMarker(latLng, isInFoodDesert);
         }
     }
     xhr.send(null);
@@ -310,4 +328,14 @@ function addFoodDesertPolygon(polygon){
     });
     mapPolygon.setMap(map);
     foodDesertPolygons.push(mapPolygon);
+}
+
+function updateFoodDesertStats(foodDesertArea, totalArea){
+    document.getElementById('food_desert_area').innerHTML = (foodDesertArea / (1000*1000)).toFixed(2) + " km<sup>2</sup>";
+    document.getElementById('total_area').innerHTML = (totalArea / (1000*1000)).toFixed(2) + " km<sup>2</sup>";
+    document.getElementById('food_desert_percent').innerHTML = ((foodDesertArea / totalArea) * 100).toFixed(2) + '%';
+}
+
+function updateStoresStats(numStores){
+    document.getElementById('num_stores').innerHTML = numStores;
 }

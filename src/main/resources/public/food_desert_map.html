@@ -4,15 +4,15 @@
         <title>Food Desert Map</title>
         <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
         <meta charset="utf-8">
-        <link rel="stylesheet" href= "food_desert_map.css">
+        <link rel="stylesheet" href="food_desert_map.css">
     </head>
 
     <body>
         <div id="map"></div>
-        <div id="controls">
-            Modes:
 
-            <br>
+        <!--left side overlay: mode and layer controls-->
+        <div class="map_overlay" id="controls">
+            <div class="overlay_head">Modes</div>
 
             <input type="radio" name="mapMode" id="query_coordinate" value="query_coordinate">
             <label for="query_coordinate">Query Coordinate</label>
@@ -34,19 +34,34 @@
 
             <hr>
 
-            Controls:
-
-            <br>
+            <div class="overlay_head">Controls</div>
 
             <button id="clearButton">Clear Markers</button>
 
             <br>
 
             <button id="resetRectButton">Reset Query Rectangle</button>
+        </div>
 
+        <!--right side overlay: layer stats display-->
+        <div class="map_overlay" id="stats" style="visibility: hidden">
+            <div class="overlay_head">Layer Statistics</div>
+
+            <table>
+                <tbody id="food_desert_stats">
+                    <tr><td>Food Desert Area</td><td id="food_desert_area"></td></tr>
+                    <tr><td>Total Area</td><td id="total_area"></td></tr>
+                    <tr><td>Percent Food Desert</td><td id="food_desert_percent"></td></tr>
+                </tbody>
+
+                <tbody id="store_stats">
+                    <tr><td>Stores Found</td><td id="num_stores"></td></tr>
+                </tbody>
+            </table>
         </div>
 
         <button id="queryButton">Submit Envelope Query</button>
+
         <script src="food_desert_map.js"></script>
         <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCEB7l7oyELTj1XkVGR5JcJylSzNQNS9Ns&libraries=places,visualization,geometry&callback=initMap" async defer></script>
     </body>

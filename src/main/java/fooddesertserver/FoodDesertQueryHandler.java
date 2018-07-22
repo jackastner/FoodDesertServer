@@ -263,8 +263,10 @@ public class FoodDesertQueryHandler {
             union = union.union(buffer);
         }
 
-        Geometry foodDeserts = searchFrame.difference(new PointTransformer(this::projDbToSrc).transform(union));
-        return new FoodDesertGeometry(foodDeserts);
+        Geometry projectedFoodDesert = projectedSearchFrame.difference(union);
+        Geometry foodDeserts = new PointTransformer(this::projDbToSrc).transform(projectedFoodDesert);
+
+        return new FoodDesertGeometry(foodDeserts, projectedFoodDesert.getArea(), projectedSearchFrame.getArea());
     }
 
     public FoodDesertGeometry getFoodDesertGeometry(Envelope searchFrame) throws SQLException, ParseException {

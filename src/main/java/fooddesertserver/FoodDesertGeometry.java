@@ -12,17 +12,25 @@ import org.locationtech.jts.geom.Polygon;
 import java.lang.reflect.Type;
 
 public class FoodDesertGeometry {
+    private final double queriedArea, foodDesertArea;
     private final Geometry foodDesertGeometry;
 
-    public FoodDesertGeometry(Geometry foodDesertGeometry){
+    public FoodDesertGeometry(Geometry foodDesertGeometry, double foodDesertArea, double queriedArea){
         this.foodDesertGeometry = foodDesertGeometry;
+        this.queriedArea = queriedArea;
+        this.foodDesertArea = foodDesertArea;
     }
 
     public static class JsonSerializer implements com.google.gson.JsonSerializer<FoodDesertGeometry> {
 
         @Override
         public JsonElement serialize(FoodDesertGeometry src, Type typeOfSrc, JsonSerializationContext context) {
-            JsonArray geom = new JsonArray();
+            JsonObject foodDesert = new JsonObject();
+
+            foodDesert.add("total_area", context.serialize(src.queriedArea));
+            foodDesert.add("desert_area", context.serialize(src.foodDesertArea));
+
+            JsonArray desertGeom = new JsonArray();
 
             for (int i = 0; i < src.foodDesertGeometry.getNumGeometries(); i++) {
                 /* Polygons in a Voronoi Diagram should not have interior rings*/
@@ -38,10 +46,12 @@ public class FoodDesertGeometry {
                     jsonPoly.add(serializeRing(interior, context));
                 }
 
-                geom.add(jsonPoly);
+                desertGeom.add(jsonPoly);
             }
 
-            return geom;
+            foodDesert.add("desert_geom", desertGeom);
+
+            return foodDesert;
         }
 
         private JsonElement serializeRing(LineString ring, JsonSerializationContext context){
