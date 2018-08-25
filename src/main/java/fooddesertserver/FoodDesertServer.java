@@ -2,12 +2,12 @@ package fooddesertserver;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import fooddesertdatabase.FoodDesertDatabase;
+import database.fooddesert.FoodDesertDatabase;
+import database.network.NetworkDatabase;
 import grocerystoresource.GooglePlacesClient;
 import grocerystoresource.GroceryStoreSource;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
-import org.locationtech.jts.geom.Geometry;
 import spark.Request;
 
 import java.io.FileInputStream;
@@ -26,8 +26,9 @@ import static spark.Spark.staticFiles;
 public class FoodDesertServer {
 
     private static void printUsage() {
-        System.out.println("Usage: java -jar FoodDesertServer.jar database_file [google_api_key]");
+        System.out.println("Usage: java -jar FoodDesertServer.jar database_file network_database_file [google_api_key]");
         System.out.println("\tdatabase_file: SqLite database file containing tables created by this server.");
+        System.out.println("\tnetwork_database_file: SqLite database file containing tables created by spatialite_osm_net");
         System.out.println("\tgoogle_api_key: a valid key for the Google Places API. If omitted, this\n\t\tprogram will look for a Java properties file containing a key value pair:");
         System.out.println("\t\tgoogle_api_key=$YOUR_API_KEY");
     }
@@ -104,16 +105,17 @@ public class FoodDesertServer {
     }
 
     public static void main(String[] args) throws IOException, SQLException {
-        if(args.length < 1) {
+        if(args.length < 2) {
             printUsage();
             return;
         }
 
         String dbFile = args[0];
+        String networkDbFile = args[1];
 
         /*get google API key from either arguments or file*/
         String googleApiKey;
-        if(args.length < 2) {
+        if(args.length < 3) {
             if (Files.exists(Paths.get("google_api_key"), LinkOption.NOFOLLOW_LINKS)) {
                  Properties props = new Properties();
                  try (FileInputStream in = new FileInputStream("google_api_key")) {
@@ -125,7 +127,7 @@ public class FoodDesertServer {
                 return;
             }
         } else {
-            googleApiKey = args[1];
+            googleApiKey = args[2];
         }
 
         /*load existing database or create a new one as needed */
@@ -137,8 +139,18 @@ public class FoodDesertServer {
             database = FoodDesertDatabase.createDatabase(dbFile);
         }
 
+        /*Network database must exists and cannot be created at runtime*/
+        NetworkDatabase networkDatabase;
+        Path networDbPath = Paths.get(networkDbFile);
+        if (Files.exists(networDbPath, LinkOption.NOFOLLOW_LINKS)) {
+            networkDatabase = new NetworkDatabase(networkDbFile);
+        } else {
+            System.out.println("Cannot start server without existing network database.\n Create a database using spatialite_osm_net then try again.");
+            return;
+        }
+
         GroceryStoreSource client = new GooglePlacesClient(googleApiKey);
-        FoodDesertQueryHandler queryHandler = new FoodDesertQueryHandler(database, client);
+        FoodDesertQueryHandler queryHandler = new FoodDesertQueryHandler(database, networkDatabase, client);
 
         setupRoutes(queryHandler);
     }

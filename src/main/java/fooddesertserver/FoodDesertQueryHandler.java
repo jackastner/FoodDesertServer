@@ -1,20 +1,22 @@
 package fooddesertserver;
 
-import fooddesertdatabase.FoodDesertDatabase;
+import database.fooddesert.FoodDesertDatabase;
+import database.network.Edge;
+import database.network.NetworkDatabase;
+import database.network.Node;
 import grocerystoresource.GroceryStoreSource;
+import org.locationtech.jts.algorithm.ConvexHull;
 import org.locationtech.jts.geom.*;
 import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.simplify.VWSimplifier;
 import org.locationtech.jts.triangulate.VoronoiDiagramBuilder;
 import org.osgeo.proj4j.*;
+import org.opensphere.geometry.algorithm.ConcaveHull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -38,14 +40,16 @@ public class FoodDesertQueryHandler {
     private static final int BUFFER_QUADRANT_SEGMENTS = 9;
 
     private final FoodDesertDatabase foodDb;
+    private final NetworkDatabase networkDb;
     private final GroceryStoreSource placesClient;
     private final GeometryFactory geoFactory;
 
     private final CoordinateTransform dbToSrc, srcToDb;
 
 
-    public FoodDesertQueryHandler(FoodDesertDatabase foodDb, GroceryStoreSource placesClient) {
+    public FoodDesertQueryHandler(FoodDesertDatabase foodDb, NetworkDatabase networkDb, GroceryStoreSource placesClient) {
         this.foodDb = foodDb;
+        this.networkDb = networkDb;
         this.placesClient = placesClient;
         this.geoFactory = new GeometryFactory();
 
@@ -257,8 +261,7 @@ public class FoodDesertQueryHandler {
 
         for(GroceryStore store : stores){
             Coordinate location = projSrcToDb(store.getLocation());
-            double radius = getBufferRadiusMeters(location);
-            Geometry buffer  = geoFactory.createPoint(location).buffer(radius);
+            Geometry buffer = networkBuffer(location);
 
             union = union.union(buffer);
         }
@@ -267,6 +270,68 @@ public class FoodDesertQueryHandler {
         Geometry foodDeserts = new PointTransformer(this::projDbToSrc).transform(projectedFoodDesert);
 
         return new FoodDesertGeometry(foodDeserts, projectedFoodDesert.getArea(), projectedSearchFrame.getArea());
+    }
+
+    public Geometry networkBuffer(Coordinate center) throws SQLException, ParseException {
+        logger.info("Building network buffer at " + center.toString());
+
+        Node intialNode = networkDb.getNearestNode(center);
+
+        logger.info("Starting node: " + intialNode);
+
+        Queue<Node> searchQueue = new LinkedList<>();
+        Map<Integer, Node> visitedSet = new HashMap<>();
+        intialNode.setDistance(0);
+        searchQueue.offer(intialNode);
+
+        while(!searchQueue.isEmpty()){
+            Node current = searchQueue.poll();
+            if(!visitedSet.containsKey(current.getId())){
+                visitedSet.put(current.getId(), current);
+                logger.info("visting node: " + current);
+                for(Edge e : networkDb.getEdges(current)){
+                    double newDistance = current.getDistance() + e.getLength();
+                    int nextId= e.getNode_from() == current.getId() ? e.getNode_to() : e.getNode_from();
+                    if(visitedSet.containsKey(nextId)){
+                        Node next = visitedSet.get(nextId);
+                        if(newDistance < next.getDistance()){
+                            next.setDistance(newDistance);
+                            logger.info("pushing child node from visted: " + next);
+                            visitedSet.remove(next.getId());
+                            searchQueue.offer(next);
+                        } else {
+                            logger.info("passing child node: " + next);
+                        }
+                    } else if (newDistance < getBufferRadiusMeters(center)) {
+                        Node next = networkDb.getNode(nextId);
+                        next.setDistance(newDistance);
+                        logger.info("pushing child node from db: " + next);
+                        searchQueue.offer(next);
+                    } else {
+                        logger.info("passing child node: " + networkDb.getNode(nextId));
+                    }
+                }
+            } else {
+                logger.info("already visited node: " + current);
+            }
+        }
+
+        Point[] pts = visitedSet.values()
+                                .stream()
+                                .map(Node::getGeometry)
+                                .map(geoFactory::createPoint)
+                                .toArray(Point[]::new);
+        GeometryCollection collection = geoFactory.createGeometryCollection(pts);
+
+        logger.info("Built GeometryCollection: " + collection.toText() + "\n\tarea: " + collection.getArea());
+
+        //This is random more or less random right now
+        final int THRESHOLD = 1;
+        Geometry buffer = new ConcaveHull(collection, THRESHOLD).getConcaveHull();
+
+        logger.info("Built ConcaveHull: " + buffer.toText() + "\n\tarea: " + buffer.getArea());
+
+        return buffer;
     }
 
     public FoodDesertGeometry getFoodDesertGeometry(Envelope searchFrame) throws SQLException, ParseException {

@@ -1,8 +1,11 @@
-package fooddesertdatabase;
+package database.fooddesert;
 
-import java.security.SecureRandom;
-import java.sql.Connection;
-import java.sql.DriverManager;
+import database.SpatialiteDatabase;
+import fooddesertserver.GroceryStore;
+import org.locationtech.jts.geom.*;
+import org.locationtech.jts.io.ParseException;
+import org.sqlite.SQLiteErrorCode;
+
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -10,14 +13,6 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
-import org.locationtech.jts.geom.*;
-import org.locationtech.jts.io.ParseException;
-import org.locationtech.jts.io.WKTReader;
-import org.sqlite.SQLiteConfig;
-import org.sqlite.SQLiteErrorCode;
-
-import fooddesertserver.GroceryStore;
 
 /**
  * @author john
@@ -30,7 +25,7 @@ import fooddesertserver.GroceryStore;
  *
  *         This class is Thread safe.
  */
-public class FoodDesertDatabase implements AutoCloseable {
+public class FoodDesertDatabase extends SpatialiteDatabase {
 
     /* String definitions for tables and columns in the spatial database */
     private static final String GROCERY_TABLE = "grocery_stores";
@@ -42,48 +37,6 @@ public class FoodDesertDatabase implements AutoCloseable {
     private static final String SEARCHED_ID_COLUMN = "id";
     private static final String SEARCHED_BUFFER_COLUMN = "buffer";
 
-    private static final String EPSG = "3857";
-
-    /**
-     * Construct a common subquery used when working with a SpatiaLite spatial index.
-     * The constructed subquery will select ids from the provided table such that the geometries
-     * of the associated rows intersect the search frame provided as an argument to an SQL prepared statement.
-     * @param indexedTable Geometry table to be queried.
-     * @return An SQL query to be used in a prepared statement that expects a WKT encoded search frame to be inserted
-     *         as it's prepared statement parameter.
-     */
-    private static String spatialIndexSubQuery(String indexedTable){
-        return "SELECT ROWID " +
-               "FROM SpatialIndex " +
-               "WHERE f_table_name = '" + indexedTable + "' " +
-               "  AND search_frame = GeomFromText(?));";
-    }
-
-    /* Loads SqLite database connection */
-    static {
-        try {
-            Class.forName("org.sqlite.JDBC");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    /* geomReader is used to parse geographic elements of the database into JTS
-     * objects.
-     * *
-     * I believe that WKTReader class is *not* thread safe so, I have made this
-     * field ThreadLocal. Consider removing this if WKTReader is thread safe or
-     * using synchronization instead of ThreadSafe.
-     */
-    private static final ThreadLocal<WKTReader> geomReader = ThreadLocal.withInitial(WKTReader::new);
-
-    /* This is the connection used to access the database */
-    private final Connection connection;
-
-    /* Most geometry construction is handled by geomReader but there are some cases
-     * where this class needs to build a Geometry directly. */
-    private final GeometryFactory geoFactory;
-
     /**
      * Opens a connection and constructs an interface for accessing the database in
      * dbFile. This should only be called on a database that was created by a call
@@ -93,26 +46,7 @@ public class FoodDesertDatabase implements AutoCloseable {
      * @throws SQLException
      */
     public FoodDesertDatabase(String dbFile) throws SQLException {
-        this.geoFactory = new GeometryFactory();
-
-        SQLiteConfig config = new SQLiteConfig();
-        config.enableLoadExtension(true);
-        this.connection = DriverManager.getConnection("jdbc:sqlite:" + dbFile, config.toProperties());
-        initSpatiaLite();
-    }
-
-    /**
-     * Instantiate a SpatiaLite interface for an existing connection. Used to reuse
-     * the connection used to create the database in createDatabase.
-     *
-     * @param spatialiteConnection
-     * @throws SQLException
-     */
-    private FoodDesertDatabase(Connection spatialiteConnection) throws SQLException {
-        this.geoFactory = new GeometryFactory();
-
-        this.connection = spatialiteConnection;
-        initSpatiaLite();
+        super(dbFile);
     }
 
     /**
@@ -125,12 +59,9 @@ public class FoodDesertDatabase implements AutoCloseable {
      * @throws SQLException
      */
     public static FoodDesertDatabase createDatabase(String dbname) throws SQLException {
-        SQLiteConfig config = new SQLiteConfig();
-        config.enableLoadExtension(true);
+        FoodDesertDatabase database = new FoodDesertDatabase(dbname);
 
-        Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbname, config.toProperties());
-
-        try (Statement stmt = conn.createStatement()) {
+        try (Statement stmt = database.connection.createStatement()) {
             /*declarations required to use SpatiaLite functions*/
             stmt.execute("SELECT load_extension('mod_spatialite')");
             stmt.execute("SELECT InitSpatialMetaData(1)");
@@ -153,15 +84,9 @@ public class FoodDesertDatabase implements AutoCloseable {
             stmt.execute("SELECT CreateSpatialIndex('" + SEARCHED_TABLE + "', '" + SEARCHED_BUFFER_COLUMN + "')");
         }
 
-        return new FoodDesertDatabase(conn);
+        return database;
     }
 
-    /* Using spatialite commands requires loading an extension */
-    private void initSpatiaLite() throws SQLException {
-        try (Statement stmt = connection.createStatement()) {
-            stmt.execute("SELECT load_extension('mod_spatialite')");
-        }
-    }
 
     /**
      * This method inserts a Grocery store into the SpatiaLite database and returns
@@ -366,34 +291,6 @@ public class FoodDesertDatabase implements AutoCloseable {
     }
 
     /**
-     * A utility function to execute a database query where the result set will contain exactly 1 geometry.
-     * @param sql The SQL query to be executed. This string can (should) be intended for use as a prepared statement.
-     * @param args Arguments that wil passed through to the SQL query as string arguments to a prepared statement.
-     * @return The single geometry returned by the query.
-     * @throws SQLException Thrown when the result set is empty of and exception is thrown by JDBC
-     */
-    private Geometry querySingleGeometryResult(String sql, String... args) throws SQLException, ParseException {
-         try(PreparedStatement stmt = connection.prepareStatement(sql)) {
-             for(int i = 0; i < args.length; i++){
-                 stmt.setString(i+1, args[i]);
-             }
-             ResultSet result = stmt.executeQuery();
-             if(result.next()) {
-                 String resultWKT = result.getString(1);
-
-                 /* It appears that when a result geometry is empty, the WKT returned by SpatiaLite is null */
-                 if(resultWKT == null){
-                     return geoFactory.createGeometryCollection();
-                 } else {
-                     return geomReader.get().read(resultWKT);
-                 }
-             } else {
-                throw new SQLException("A query that should always return a result did not return anything!");
-            }
-        }
-    }
-
-    /**
      * Delete the contents of this database while preserving the structure
      * @throws SQLException
      */
@@ -406,13 +303,7 @@ public class FoodDesertDatabase implements AutoCloseable {
         }
     }
 
-    @Override
-    public void close() throws SQLException {
-        connection.close();
-    }
-
     public String getEpsg(){
         return EPSG;
     }
-
 }

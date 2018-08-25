@@ -23,7 +23,7 @@ import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.io.ParseException;
 
-import fooddesertdatabase.FoodDesertDatabase;
+import database.fooddesert.FoodDesertDatabase;
 
 public class FoodDesertQueryHandlerTest {
 

@@ -22,7 +22,7 @@ jar {
 }
 
 run {
-    args = ["data.db"]
+    args = ["data.db", "network.db"]
 }
 
 dependencies {
@@ -37,4 +37,3 @@ dependencies {
     // Use JUnit test framework
     testCompile 'junit:junit:4.12'
 }
-

@@ -8,6 +8,7 @@ import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.util.List;
 
+import database.fooddesert.FoodDesertDatabase;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
