@@ -1,8 +1,9 @@
 # Food Desert Server
 This repository contains a server and javascript web client that attempt to detect and display areas that are in a food
-desert. The current implementation achieves this by querying the 
+desert. The current implementation achieves this by querying the
 [Google Places API](https://developers.google.com/places/web-service/intro) for the locations of grocery stores then
-storing this data in a [Spatialite database](https://www.gaia-gis.it/fossil/libspatialite/index).
+storing this data in a [Spatialite database](https://www.gaia-gis.it/fossil/libspatialite/index). Road network data is
+obtained from [OpenStreetMap](https://www.openstreetmap.org/about).
 
 For the purpose of this project, a point is in a food desert if there are no grocery stores contained in a 1 mile buffer
 around the point. This approach is limited due to the quality of data obtained from the Places API and the inadequate
@@ -15,47 +16,61 @@ the buffer outside of urban areas would greatly improve the usefulness of this p
 * Install spatialite 4.3.0
 * Install JDK8
 * `git clone https://github.com/jackastner/FoodDesertServer.git`
-* Enter a google api key valid for use with the Google Places API into the file `google_api_key` in the root of this 
+* Enter a google api key valid for use with the Google Places API into the file `google_api_key` in the root of this
   repository.
 * `./gradlew test`
 
-If the Gradle build succeeds and all tests pass, the project has been successfully setup. The most common reason for 
+If the Gradle build succeeds and all tests pass, the project has been successfully setup. The most common reason for
 failing tests is a missing or invalid API key.
- 
+
+# Prepare Road Network Database
+The server uses data from Open Street Map to compute a 1 mile walking distance buffer around grocery stores. Since this
+data can be extreamly large and areas of interest depend on the user, it is not included in the repository; however, it
+is available for free download from Open Street Map.
+
+* Visit the [OSM export website](https://www.openstreetmap.org/export). Use the controls to select an area of interest
+  then download the data from OSM or one of their mirrors.
+* Process the data with the provided `mknetwork` script. This script runs the Spatialite tool for processing OSM data
+  then performs post processing to transform the data into the EPGS used by the server.
+
+        ./mknetwork network.db map.osm
+
 # Run Server
-First, follow the the steps in Project Setup. You can then choose to run the server directly through Gradle or by 
+First, follow the the steps in Project Setup. You can then choose to run the server directly through Gradle or by
 building and executing a jar file.
- 
+
 ## Run with Gradle
 `./gradlew run`
-This will start the server using the google api key entered during setup and using the default database file (`data.db`).
-  
+This will start the server using the google api key entered during setup and using the default database files
+(`data.db` and `network.db`).
+
 ## Build the Jar
 * `./gradlew jar`
 * `java -jar build/libs/FoodDesertServer.jar` to see usage information.
 
-      Usage: java -jar FoodDesertServer.jar database_file [google_api_key]
-      	database_file: SqLite database file containing tables created by this server.
-      	google_api_key: a valid key for the Google Places API. If omitted, this
-      		program will look for a Java properties file containing a key value pair:
-      		google_api_key=$YOUR_API_KEY
-      		
-* `java jar build/libs/FoodDesertServer.jar data.db` to run in the default configuration. 
+        Usage: java -jar FoodDesertServer.jar database_file network_database_file [google_api_key]
+            database_file: SqLite database file containing tables created by this server.
+            network_database_file: SqLite database file containing tables created by spatialite_osm_net
+            google_api_key: a valid key for the Google Places API. If omitted, this
+                program will look for a Java properties file containing a key value pair:
+                google_api_key=$YOUR_API_KEY
+
+* `java jar build/libs/FoodDesertServer.jar data.db network.db` to run in the default configuration.
 
 # Use Server
-Once the server is running, the web interface is available at http://localhost:4567/food_desert_map.html . The interface
+Once the server is running, the web interface is available at http://localhost:4567/food_desert_map.html. The interface
 provides access to methods defined in FoodDesertQueryHandler and displays results on a map.
- 
+
 ---
- 
+
 # Unimplemented Features
 
 * Obtain and display polygon(s) representing areas that are food deserts (Completed but subpoints aren't).
-  * Generate these polygons using walking distance (rather than Euclidean distance). 
+  * Generate these polygons using walking distance (rather than Euclidean distance) (in progress).
   * Account for location in these polygons. In Suburban and rural areas, distance to a grocery store can be much larger
     without being a food desert.
 * Find alternative data sources. Google Places API will be paid only soon (It still works for some reason).
-  * PG county data website provides grocery store locations that could be loaded into the database. Presumably other 
+  * PG county data website provides grocery store locations that could be loaded into the database. Presumably other
     data sources like this exist.
   * I would like to find a solution that can get data for arbitrary locations like the Places API.
 * Switch user interface to OSM.
