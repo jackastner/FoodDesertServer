@@ -1,10 +1,12 @@
 package database.network;
 
-import database.SpatialiteDatabase;
+import database.SpatialiteDatabase; import fooddesertserver.FoodDesertQueryHandler;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.io.ParseException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -12,6 +14,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class NetworkDatabase extends SpatialiteDatabase {
+    private static final Logger logger = LoggerFactory.getLogger(FoodDesertQueryHandler.class);
+
     private static final String NODE_TABLE = "network_nodes";
     private static final String NODE_ID = "node_id";
     private static final String CARDINALITY = "cardinality";
@@ -36,27 +40,29 @@ public class NetworkDatabase extends SpatialiteDatabase {
     private static Node readResultNode(ResultSet result) throws SQLException, ParseException {
        int nodeId = result.getInt(1);
        int cardinality = result.getInt(2);
-       Coordinate geometry = geomReader.get().read(result.getString(3)).getCoordinate();
+       String pointWKT = result.getString(3);
+
+       Coordinate geometry = geomReader.get().read(pointWKT).getCoordinate();
        return new Node(nodeId, cardinality, geometry);
     }
 
-    public Node getNearestNode(Coordinate coordinate) throws SQLException, ParseException {
+    public Node getNearestNode(Coordinate coordinate, double max_dist) throws SQLException, ParseException {
        String sql =
-               "SELECT " + NODE_ID + ", " + CARDINALITY + ", AsText(ST_Transform(" + GEOMETRY + ", " + EPSG + ")), Min(Distance(ST_Transform(" + GEOMETRY + ", " + EPSG + "), " + "GeomFromText(?, " + EPSG + "))) " +
-               "FROM " + NODE_TABLE;//+ " " +
-       //        "WHERE " + NODE_ID + " IN (" +
-       //             spatialIndexSubQuery(NODE_TABLE) + ");";
+               "SELECT " + NODE_ID + ", " + CARDINALITY + ", AsText(" + GEOMETRY + "), Min(Distance(" + GEOMETRY + ", GeomFromText(?, " + EPSG + "))) " +
+               "FROM " + NODE_TABLE + " " +
+               "WHERE " + NODE_ID + " IN (" +
+                    spatialIndexSubQuery(NODE_TABLE) + ");";
 
        Point coordPoint = geoFactory.createPoint(coordinate);
 
-       //Geometry  searchFrame =
+       Geometry searchFrame = coordPoint.buffer(max_dist);
 
-       return queryWithResult(sql, NetworkDatabase::readResultNode, coordPoint.toText());
+       return queryWithResult(sql, NetworkDatabase::readResultNode, coordPoint.toText(), searchFrame.toText());
     }
 
     public Node getNode(int nodeId) throws SQLException, ParseException {
         String sql =
-                "SELECT " + NODE_ID + ", " + CARDINALITY + ", AsText(ST_Transform(" + GEOMETRY + ", " + EPSG +")) " +
+                "SELECT " + NODE_ID + ", " + CARDINALITY + ", AsText(" + GEOMETRY + ") " +
                 "FROM " + NODE_TABLE + " " +
                 "WHERE " + NODE_ID + "=?";
         return queryWithResult(sql, NetworkDatabase::readResultNode, String.valueOf(nodeId));

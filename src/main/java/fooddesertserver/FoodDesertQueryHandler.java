@@ -5,7 +5,6 @@ import database.network.Edge;
 import database.network.NetworkDatabase;
 import database.network.Node;
 import grocerystoresource.GroceryStoreSource;
-import org.locationtech.jts.algorithm.ConvexHull;
 import org.locationtech.jts.geom.*;
 import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.simplify.VWSimplifier;
@@ -261,7 +260,7 @@ public class FoodDesertQueryHandler {
 
         for(GroceryStore store : stores){
             Coordinate location = projSrcToDb(store.getLocation());
-            Geometry buffer = networkBuffer(location);
+            Geometry buffer = networkBuffer(location, bufferedSearchFrame);
 
             union = union.union(buffer);
         }
@@ -272,12 +271,10 @@ public class FoodDesertQueryHandler {
         return new FoodDesertGeometry(foodDeserts, projectedFoodDesert.getArea(), projectedSearchFrame.getArea());
     }
 
-    public Geometry networkBuffer(Coordinate center) throws SQLException, ParseException {
-        logger.info("Building network buffer at " + center.toString());
+    public Geometry networkBuffer(Coordinate center, Geometry bufferBounds) throws SQLException, ParseException {
+        networkDb.setAutoCommit(false);
 
-        Node intialNode = networkDb.getNearestNode(center);
-
-        logger.info("Starting node: " + intialNode);
+        Node intialNode = networkDb.getNearestNode(center, getBufferRadiusMeters(center));
 
         Queue<Node> searchQueue = new LinkedList<>();
         Map<Integer, Node> visitedSet = new HashMap<>();
@@ -288,33 +285,36 @@ public class FoodDesertQueryHandler {
             Node current = searchQueue.poll();
             if(!visitedSet.containsKey(current.getId())){
                 visitedSet.put(current.getId(), current);
-                logger.info("visting node: " + current);
-                for(Edge e : networkDb.getEdges(current)){
+
+                if(current.getEdges() == null){
+                    List<Edge> edges = networkDb.getEdges(current);
+                    current.setEdges(edges);
+                }
+
+                for(Edge e : current.getEdges()){
                     double newDistance = current.getDistance() + e.getLength();
                     int nextId= e.getNode_from() == current.getId() ? e.getNode_to() : e.getNode_from();
                     if(visitedSet.containsKey(nextId)){
                         Node next = visitedSet.get(nextId);
                         if(newDistance < next.getDistance()){
                             next.setDistance(newDistance);
-                            logger.info("pushing child node from visted: " + next);
                             visitedSet.remove(next.getId());
                             searchQueue.offer(next);
-                        } else {
-                            logger.info("passing child node: " + next);
                         }
                     } else if (newDistance < getBufferRadiusMeters(center)) {
                         Node next = networkDb.getNode(nextId);
-                        next.setDistance(newDistance);
-                        logger.info("pushing child node from db: " + next);
-                        searchQueue.offer(next);
-                    } else {
-                        logger.info("passing child node: " + networkDb.getNode(nextId));
+                        if(bufferBounds.contains(geoFactory.createPoint(next.getGeometry()))){
+                            next.setDistance(newDistance);
+                            searchQueue.offer(next);
+                        }
                     }
                 }
-            } else {
-                logger.info("already visited node: " + current);
+
             }
         }
+
+        networkDb.commit();
+        networkDb.setAutoCommit(true);
 
         Point[] pts = visitedSet.values()
                                 .stream()
@@ -323,13 +323,9 @@ public class FoodDesertQueryHandler {
                                 .toArray(Point[]::new);
         GeometryCollection collection = geoFactory.createGeometryCollection(pts);
 
-        logger.info("Built GeometryCollection: " + collection.toText() + "\n\tarea: " + collection.getArea());
-
         //This is random more or less random right now
-        final int THRESHOLD = 1;
+        final int THRESHOLD = 100;
         Geometry buffer = new ConcaveHull(collection, THRESHOLD).getConcaveHull();
-
-        logger.info("Built ConcaveHull: " + buffer.toText() + "\n\tarea: " + buffer.getArea());
 
         return buffer;
     }

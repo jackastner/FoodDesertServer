@@ -43,12 +43,16 @@ spatialite $NETWORK_DB <<EOF
 
     SELECT RecoverGeometryColumn('$TEMP_NODE_TABLE', 'geometry', $EPSG, 'POINT');
 
-    SELECT CreateSpatialIndex('$TEMP_NODE_TABLE', 'geometry');
-
     --drop original database then rename temp
     DROP TABLE $NETWORK_NODE_TABLE;
 
     ALTER TABLE $TEMP_NODE_TABLE RENAME TO $NETWORK_NODE_TABLE;
+
+    --create indices to optimize some queries
+    SELECT CreateSpatialIndex('$NETWORK_NODE_TABLE', 'geometry');
+    CREATE INDEX idx_node_id ON $NETWORK_NODE_TABLE (node_id);
+    CREATE INDEX idx_edge_node_to ON $NETWORK_EDGE_TABLE (node_to);
+    CREATE INDEX idx_edge_node_from ON $NETWORK_EDGE_TABLE (node_from);
 
     COMMIT;
 

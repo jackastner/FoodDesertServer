@@ -125,6 +125,21 @@ public class SpatialiteDatabase implements AutoCloseable {
          }
     }
 
+    /**
+     * Pass through autocommit function of the connection.
+     * This lets calling classes batch a sequence of queries.
+     */
+    public void setAutoCommit(boolean autoCommit) throws SQLException {
+        connection.setAutoCommit(autoCommit);
+    }
+
+    /**
+     * Pass through commit function of the connection.
+     */
+    public void commit() throws SQLException {
+        connection.commit();
+    }
+
     @FunctionalInterface
     public interface ResultProcessor<T> extends Function<ResultSet, T> {
         default T apply(ResultSet set){

@@ -1,6 +1,7 @@
 package database.network;
 
 import org.locationtech.jts.geom.Coordinate;
+import java.util.List;
 
 /**
  * This class represents an entry into the *_nodes table in a Spatialite database generated from OSM data.
@@ -9,6 +10,8 @@ public class Node {
     private final int id;
     private final int cardinality;
     private final Coordinate geometry;
+
+    private List<Edge> edges;
 
     private double distance;
 
@@ -50,6 +53,14 @@ public class Node {
 
     public void setDistance(double distance) {
         this.distance = distance;
+    }
+
+    public void setEdges(List<Edge> edges) {
+        this.edges = edges;
+    }
+
+    public List<Edge> getEdges(){
+        return edges;
     }
 
     @Override
