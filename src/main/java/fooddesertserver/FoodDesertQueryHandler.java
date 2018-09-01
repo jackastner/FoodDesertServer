@@ -276,8 +276,16 @@ public class FoodDesertQueryHandler {
 
         Node intialNode = networkDb.getNearestNode(center, getBufferRadiusMeters(center));
 
+        /* There is no node inside the search are,
+         * return an empty geometry as the bufer.*/
+        if(intialNode == null){
+            logger.info("empty network buffer at " + center.toString());
+            return geoFactory.createGeometryCollection();
+        }
+
         Queue<Node> searchQueue = new LinkedList<>();
         Map<Integer, Node> visitedSet = new HashMap<>();
+        Set<Edge> visitedEdgeSet = new HashSet<>();
         intialNode.setDistance(0);
         searchQueue.offer(intialNode);
 
@@ -306,6 +314,7 @@ public class FoodDesertQueryHandler {
                         if(bufferBounds.contains(geoFactory.createPoint(next.getGeometry()))){
                             next.setDistance(newDistance);
                             searchQueue.offer(next);
+                            visitedEdgeSet.add(e);
                         }
                     }
                 }
@@ -316,12 +325,10 @@ public class FoodDesertQueryHandler {
         networkDb.commit();
         networkDb.setAutoCommit(true);
 
-        Point[] pts = visitedSet.values()
-                                .stream()
-                                .map(Node::getGeometry)
-                                .map(geoFactory::createPoint)
-                                .toArray(Point[]::new);
-        GeometryCollection collection = geoFactory.createGeometryCollection(pts);
+        Geometry[] edgeLines = visitedEdgeSet.stream()
+                                             .map(Edge::getGeometry)
+                                             .toArray(Geometry[]::new);
+        GeometryCollection collection = geoFactory.createGeometryCollection(edgeLines);
 
         //This is random more or less random right now
         final int THRESHOLD = 100;

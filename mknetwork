@@ -22,39 +22,57 @@ NETWORK_EDGE_TABLE=network
 NETWORK_NODE_TABLE=${NETWORK_EDGE_TABLE}_nodes
 EPSG=3857
 
+
+# Reproject the geometry column of a table to that it is in the same epsg as
+# the grocery store databse.
+# $reproject_table TABLE_NAME PK_COL_NAME
+function reproject_table() {
+    SRC_TABLE=$1
+    PK_COL=$2
+
+    # geometry column name and type can be recovered from the spatialite database.
+    GEOM_COL=$(spatialite $NETWORK_DB <<< 'SELECT f_geometry_column FROM geometry_columns WHERE f_table_name = "'$SRC_TABLE'";')
+    GEOM_TYPE=$(spatialite $NETWORK_DB <<< 'SELECT GeometryType('$GEOM_COL') FROM '$SRC_TABLE' LIMIT 1;')
+
+    # SQL script handles updates to the database
+    TEMP_TABLE=${SRC_TABLE}_tmp
+    spatialite $NETWORK_DB <<EOF
+        BEGIN;
+
+        CREATE TABLE $TEMP_TABLE
+        AS SELECT *
+        FROM $SRC_TABLE;
+
+        UPDATE $TEMP_TABLE SET $GEOM_COL=(
+            SELECT ST_Transform($SRC_TABLE.$GEOM_COL, $EPSG)
+            FROM $SRC_TABLE
+            WHERE $SRC_TABLE.$PK_COL = $TEMP_TABLE.$PK_COL);
+
+        SELECT DiscardGeometryColumn('$SRC_TABLE', '$GEOM_COL');
+
+        DROP TABLE $SRC_TABLE;
+
+        ALTER TABLE $TEMP_TABLE RENAME TO $SRC_TABLE;
+
+        SELECT RecoverGeometryColumn('$SRC_TABLE', '$GEOM_COL', $EPSG, '$GEOM_TYPE');
+
+        COMMIT;
+
+        VACUUM;
+EOF
+}
+
 # generate initial spatialite database from osm data
 spatialite_osm_net -d $NETWORK_DB -o $OSM_DATA --roads -T $NETWORK_EDGE_TABLE
 
-# transform to store database projection and create spatial index
-TEMP_NODE_TABLE=${NETWORK_NODE_TABLE}_proj
+# both network tables are reprojected to the grocery store database epsg.
+reproject_table $NETWORK_EDGE_TABLE id
+reproject_table $NETWORK_NODE_TABLE node_id
+
+#create indices to optimize some queries
 spatialite $NETWORK_DB <<EOF
-    BEGIN;
-
-    --temp table to hold projected data
-    CREATE TABLE $TEMP_NODE_TABLE
-    AS SELECT node_id, osm_id, cardinality, geometry
-    FROM $NETWORK_NODE_TABLE;
-
-    --project geometry to epgs used by grocery store database
-    UPDATE $TEMP_NODE_TABLE SET geometry=(
-      SELECT ST_Transform($NETWORK_NODE_TABLE.geometry, $EPSG)
-      FROM $NETWORK_NODE_TABLE 
-      WHERE $NETWORK_NODE_TABLE.node_id = $TEMP_NODE_TABLE.node_id);
-
-    SELECT RecoverGeometryColumn('$TEMP_NODE_TABLE', 'geometry', $EPSG, 'POINT');
-
-    --drop original database then rename temp
-    DROP TABLE $NETWORK_NODE_TABLE;
-
-    ALTER TABLE $TEMP_NODE_TABLE RENAME TO $NETWORK_NODE_TABLE;
-
-    --create indices to optimize some queries
     SELECT CreateSpatialIndex('$NETWORK_NODE_TABLE', 'geometry');
     CREATE INDEX idx_node_id ON $NETWORK_NODE_TABLE (node_id);
     CREATE INDEX idx_edge_node_to ON $NETWORK_EDGE_TABLE (node_to);
     CREATE INDEX idx_edge_node_from ON $NETWORK_EDGE_TABLE (node_from);
-
-    COMMIT;
-
-    VACUUM;
 EOF
